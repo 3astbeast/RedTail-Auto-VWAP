@@ -17,21 +17,6 @@
 
 ---
 
-**IMPORTANT INSTALLATION INSTRUCTIONS**
-
-This indicator uses Windows Voice for alerts instead of Ninja Trader's built in beeps, honks and blips. If you install this .cs file and get an error on compilation, your NT install is missing a required .dll.  See step #7 below:
-
-1. Download the .cs file from the indicator's repository
-2. Copy the .cs to documents\Ninja Trader 8\bin\custom\indicators
-3. Open Ninja Trader (if not already open) 
-4. In control center, go to New --> Ninja Script Editor
-5. Expand the Indicator Tree, find your new indicator, double click to open it
-6. At the top of the Editor window, click the "Compile" button
-7. If you get an error on compilation, do the following: Open Ninja Compiler, right click and choose references. Click add. Browse to this: C:\Windows\Microsoft.NET\assembly\GAC_MSIL\System.Speech\v4.0_4.0.0.0__31bf3856ad364e35\System.Speech.dll
-8. After that .dll is referenced, the indicator will compile successfully.
-   
----
-
 ## Overview
 
 RedTail Auto VWAP automatically calculates and plots up to 9 different VWAP anchors along with NY Opening Range and Day Initial Balance zones. Every VWAP type resets automatically at the appropriate anchor point — no manual drawing required. The indicator uses SharpDX rendering for performance, is fully EST timezone-aware, and includes a voice alert system that announces VWAP touches and approaches with the instrument name.
@@ -133,17 +118,38 @@ Every VWAP type has independent visual controls: color, line style (Solid/Dash/D
 
 ---
 
+## VWAP Fib Bands
+
+An optional built-in feature that wraps the Session VWAP in standard deviation bands and Fibonacci sub-bands — similar to the standalone RedTail VWAP Fib Bands indicator, but integrated directly into Auto-VWAP so you don't need a separate indicator on your chart.
+
+**Standard Deviation Bands**
+- Two configurable σ band pairs around the Session VWAP
+- Band 1 (default: ±1.0σ, solid) — inner mean-reversion zone
+- Band 2 (default: ±2.0σ, dashed) — extension zone
+- Independent color and line style for each band pair
+
+**Fibonacci Sub-Bands**
+- Configurable comma-separated ratios interpolated between VWAP and the ±Band 2 extremes
+- Default levels: 0.236, 0.382, 0.5, 0.618, 0.786
+- Independent color and line style
+
+**Fill & Labels**
+- Optional graduated fill zones between the band pairs (inner = full opacity, outer = 50%)
+- Configurable fill opacity (default: 12%)
+- Optional right-edge labels with σ notation for bands and decimal notation for fibs
+- Configurable label font size
+
+---
+
 ## Installation
 
-1. Download the .cs file from the indicator's repository
-2. Copy the .cs to documents\Ninja Trader 8\bin\custom\indicators
-3. Open Ninja Trader (if not already open) 
-4. In control center, go to New --> Ninja Script Editor
-5. Expand the Indicator Tree, find your new indicator, double click to open it
-6. At the top of the Editor window, click the "Compile" button
-7. That's it!
+1. Download the `.cs` file from this repository
+2. Open NinjaTrader 8
+3. Go to **Tools → Import → NinjaScript Add-On**
+4. Select the downloaded file and click **OK**
+5. The indicator will appear in your **Indicators** list — add it to any chart
 
-> **Note:** All session times are EST/ET timezone-aware. The indicator auto-detects the Eastern timezone and converts bar times accordingly.
+> **Note:** All session times are EST/ET timezone-aware. The indicator auto-detects the Eastern timezone and converts bar times accordingly, with cross-platform support for both Windows and Linux/Mac timezone IDs.
 
 ---
 
