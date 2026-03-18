@@ -172,6 +172,9 @@ namespace NinjaTrader.NinjaScript.Indicators
         private Dictionary<string, bool> lastTouchState;
         private Dictionary<string, bool> lastApproachState;
         
+        // Fib Band parsed levels
+        private double[] fibBandLevels = new double[0];
+        
         #endregion
 
         protected override void OnStateChange()
@@ -296,6 +299,23 @@ namespace NinjaTrader.NinjaScript.Indicators
                 ApproachTicks = 8;
                 AlertCooldownSeconds = 30;
                 AlertFallbackSound = "Alert1.wav";
+                
+                // Session VWAP - Fib Bands
+                ShowVwapFibBands   = false;
+                FibBandVwapTarget  = "Session";
+                FibBand1Mult       = 1.0;
+                FibBand2Mult       = 2.0;
+                FibBandLevelsInput = "0.236, 0.382, 0.5, 0.618, 0.786";
+                ShowFibBandFill    = true;
+                FibBandFillOpacity = 12;
+                ShowFibBandLabels  = true;
+                FibBandLabelSize   = 10;
+                FibBand1Color  = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(200, 255, 80, 80));
+                FibBand1Style  = DashStyleHelper.Solid;
+                FibBand2Color  = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(200, 255, 80, 80));
+                FibBand2Style  = DashStyleHelper.Dash;
+                FibSubBandColor = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(140, 160, 160, 160));
+                FibSubBandStyle = DashStyleHelper.Dot;
             }
             else if (State == State.Configure)
             {
@@ -344,6 +364,9 @@ namespace NinjaTrader.NinjaScript.Indicators
                 lastAlertTime = new Dictionary<string, DateTime>();
                 lastTouchState = new Dictionary<string, bool>();
                 lastApproachState = new Dictionary<string, bool>();
+                
+                // Parse Fib Band levels
+                ParseFibBandLevels();
                 
                 if (EnableVoiceAlerts)
                 {
@@ -805,6 +828,26 @@ namespace NinjaTrader.NinjaScript.Indicators
                 return new SharpDX.Color4(c.R / 255f, c.G / 255f, c.B / 255f, (c.A / 255f) * opacity);
             }
             return new SharpDX.Color4(1, 1, 1, opacity);
+        }
+        
+        private void ParseFibBandLevels()
+        {
+            if (string.IsNullOrWhiteSpace(FibBandLevelsInput))
+            {
+                fibBandLevels = new double[0];
+                return;
+            }
+            var parts = FibBandLevelsInput
+                .Replace(" ", "")
+                .Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            var list = new System.Collections.Generic.List<double>();
+            foreach (var p in parts)
+                if (double.TryParse(p,
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out double v))
+                    list.Add(v);
+            fibBandLevels = list.ToArray();
         }
         
         #endregion
@@ -1406,6 +1449,25 @@ Write-Host 'COPIED_MP3'
             }
             
             // ═══════════════════════════════════════════════
+            // Render VWAP Fib Bands
+            // ═══════════════════════════════════════════════
+            if (ShowVwapFibBands)
+            {
+                if (FibBandVwapTarget == "Session" && ShowDayVwap && dayVwap.IsActive)
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, dayVwap, firstBarVisible, lastBarVisible);
+                else if (FibBandVwapTarget == "NY Session" && ShowNyVwap && nyVwap.IsActive)
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, nyVwap, firstBarVisible, lastBarVisible);
+                else if (FibBandVwapTarget == "HOD" && ShowHodVwap && hodVwap.IsActive)
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, hodVwap, firstBarVisible, lastBarVisible);
+                else if (FibBandVwapTarget == "LOD" && ShowLodVwap && lodVwap.IsActive)
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, lodVwap, firstBarVisible, lastBarVisible);
+                else if (FibBandVwapTarget == "Month" && ShowMonthVwap && monthVwap.IsActive)
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, monthVwap, firstBarVisible, lastBarVisible);
+                else if (FibBandVwapTarget == "Year" && ShowYearVwap && yearVwap.IsActive)
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, yearVwap, firstBarVisible, lastBarVisible);
+            }
+            
+            // ═══════════════════════════════════════════════
             // Render Ranges (with text merging for overlapping levels)
             // ═══════════════════════════════════════════════
             
@@ -1883,6 +1945,198 @@ Write-Host 'COPIED_MP3'
             }
         }
         
+        // ── Render VWAP Fib Bands ─────────────────────────────────────────────
+        // Draws ±Band1Mult σ, ±Band2Mult σ lines plus Fibonacci sub-bands
+        // (interpolated between VWAP and ±Band2Mult σ), with optional fill and labels.
+        private void RenderVwapFibBands(RenderTarget renderTarget, ChartControl chartControl, ChartScale chartScale,
+            VwapData vwap, int firstBar, int lastBar, int maxBar = -1)
+        {
+            if (!vwap.IsActive || vwap.AnchorBar < 0) return;
+            
+            int startBar = Math.Max(vwap.AnchorBar, firstBar);
+            int endBar   = Math.Min(CurrentBar, lastBar);
+            if (maxBar >= 0) endBar = Math.Min(endBar, maxBar);
+            if (startBar >= endBar) return;
+            
+            var oldAA = renderTarget.AntialiasMode;
+            renderTarget.AntialiasMode = SharpDX.Direct2D1.AntialiasMode.PerPrimitive;
+            
+            // ── Reconstruct band point arrays bar-by-bar ──
+            // We need vwap, upper1, lower1, upper2, lower2 + fib lines as point lists
+            var ptsVwap   = new List<SharpDX.Vector2>();
+            var ptsU1     = new List<SharpDX.Vector2>();
+            var ptsL1     = new List<SharpDX.Vector2>();
+            var ptsU2     = new List<SharpDX.Vector2>();
+            var ptsL2     = new List<SharpDX.Vector2>();
+            var ptsFibUp  = new List<SharpDX.Vector2>[fibBandLevels.Length];
+            var ptsFibDn  = new List<SharpDX.Vector2>[fibBandLevels.Length];
+            for (int f = 0; f < fibBandLevels.Length; f++)
+            {
+                ptsFibUp[f] = new List<SharpDX.Vector2>();
+                ptsFibDn[f] = new List<SharpDX.Vector2>();
+            }
+            
+            double cumVol = 0, cumTypVol = 0, cumVolSq = 0;
+            
+            for (int i = vwap.AnchorBar; i <= endBar; i++)
+            {
+                int barsAgo = CurrentBar - i;
+                if (barsAgo < 0 || barsAgo >= Bars.Count) continue;
+                
+                double vol = Volume.GetValueAt(i);
+                double src = (Open.GetValueAt(i) + High.GetValueAt(i) + Low.GetValueAt(i) + Close.GetValueAt(i)) / 4.0;
+                cumVol    += vol;
+                cumTypVol += src * vol;
+                cumVolSq  += src * src * vol;
+                if (cumVol <= 0) continue;
+                
+                double vwapVal  = cumTypVol / cumVol;
+                double variance = (cumVolSq / cumVol) - (vwapVal * vwapVal);
+                double stdDev   = variance > 0 ? Math.Sqrt(variance) : 0;
+                
+                double u1 = vwapVal + FibBand1Mult * stdDev;
+                double l1 = vwapVal - FibBand1Mult * stdDev;
+                double u2 = vwapVal + FibBand2Mult * stdDev;
+                double l2 = vwapVal - FibBand2Mult * stdDev;
+                
+                if (i < firstBar) continue;  // accumulate but don't plot off-screen bars
+                
+                float x = chartControl.GetXByBarIndex(ChartBars, i);
+                ptsVwap.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(vwapVal)));
+                ptsU1.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(u1)));
+                ptsL1.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(l1)));
+                ptsU2.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(u2)));
+                ptsL2.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(l2)));
+                
+                for (int f = 0; f < fibBandLevels.Length; f++)
+                {
+                    double fib = fibBandLevels[f];
+                    ptsFibUp[f].Add(new SharpDX.Vector2(x, chartScale.GetYByValue(vwapVal + fib * (u2 - vwapVal))));
+                    ptsFibDn[f].Add(new SharpDX.Vector2(x, chartScale.GetYByValue(vwapVal - fib * (vwapVal - l2))));
+                }
+            }
+            
+            if (ptsVwap.Count < 2) { renderTarget.AntialiasMode = oldAA; return; }
+            
+            // ── Build SharpDX brushes ──
+            float fillAlpha  = Math.Max(0, Math.Min(100, FibBandFillOpacity)) / 100f;
+            SharpDX.Color4 c1 = BrushToColor4(FibBand1Color);
+            SharpDX.Color4 c2 = BrushToColor4(FibBand2Color);
+            SharpDX.Color4 cf = BrushToColor4(FibSubBandColor);
+            
+            using (var brushU1     = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, c1))
+            using (var brushU2     = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, c2))
+            using (var brushFib    = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, cf))
+            using (var fillInner   = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, new SharpDX.Color4(c1.Red, c1.Green, c1.Blue, fillAlpha)))
+            using (var fillOuter   = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, new SharpDX.Color4(c2.Red, c2.Green, c2.Blue, fillAlpha * 0.5f)))
+            using (var ss1  = GetStrokeStyle(renderTarget, FibBand1Style))
+            using (var ss2  = GetStrokeStyle(renderTarget, FibBand2Style))
+            using (var ssF  = GetStrokeStyle(renderTarget, FibSubBandStyle))
+            using (var labelTextFmt = new SharpDX.DirectWrite.TextFormat(NinjaTrader.Core.Globals.DirectWriteFactory, "Arial", FibBandLabelSize))
+            {
+                // ── Fill zones ──
+                if (ShowFibBandFill)
+                {
+                    // Inner zone: VWAP to ±Band1 (both sides)
+                    DrawFibFill(renderTarget, ptsU1, ptsVwap, fillInner);
+                    DrawFibFill(renderTarget, ptsVwap, ptsL1,  fillInner);
+                    // Outer zone: ±Band1 to ±Band2
+                    DrawFibFill(renderTarget, ptsU2, ptsU1, fillOuter);
+                    DrawFibFill(renderTarget, ptsL1, ptsL2, fillOuter);
+                }
+                
+                // ── Band lines ──
+                DrawFibLine(renderTarget, ptsU1, brushU1, 1.5f, ss1);
+                DrawFibLine(renderTarget, ptsL1, brushU1, 1.5f, ss1);
+                DrawFibLine(renderTarget, ptsU2, brushU2, 1f,   ss2);
+                DrawFibLine(renderTarget, ptsL2, brushU2, 1f,   ss2);
+                
+                for (int f = 0; f < fibBandLevels.Length; f++)
+                {
+                    DrawFibLine(renderTarget, ptsFibUp[f], brushFib, 1f, ssF);
+                    DrawFibLine(renderTarget, ptsFibDn[f], brushFib, 1f, ssF);
+                }
+                
+                // ── Right-edge labels ──
+                if (ShowFibBandLabels && ptsVwap.Count > 0)
+                {
+                    float rightX = ptsVwap[ptsVwap.Count - 1].X + 4f;
+                    
+                    DrawFibLabel(renderTarget, rightX, ptsU1[ptsU1.Count - 1].Y,
+                        $"+{FibBand1Mult:0.0#}σ", brushU1, labelTextFmt);
+                    DrawFibLabel(renderTarget, rightX, ptsL1[ptsL1.Count - 1].Y,
+                        $"-{FibBand1Mult:0.0#}σ", brushU1, labelTextFmt);
+                    DrawFibLabel(renderTarget, rightX, ptsU2[ptsU2.Count - 1].Y,
+                        $"+{FibBand2Mult:0.0#}σ", brushU2, labelTextFmt);
+                    DrawFibLabel(renderTarget, rightX, ptsL2[ptsL2.Count - 1].Y,
+                        $"-{FibBand2Mult:0.0#}σ", brushU2, labelTextFmt);
+                    
+                    for (int f = 0; f < fibBandLevels.Length; f++)
+                    {
+                        if (ptsFibUp[f].Count > 0)
+                            DrawFibLabel(renderTarget, rightX, ptsFibUp[f][ptsFibUp[f].Count - 1].Y,
+                                fibBandLevels[f].ToString("0.000"), brushFib, labelTextFmt);
+                        if (ptsFibDn[f].Count > 0)
+                            DrawFibLabel(renderTarget, rightX, ptsFibDn[f][ptsFibDn[f].Count - 1].Y,
+                                fibBandLevels[f].ToString("0.000"), brushFib, labelTextFmt);
+                    }
+                }
+            }
+            
+            renderTarget.AntialiasMode = oldAA;
+        }
+        
+        private void DrawFibLine(RenderTarget rt, List<SharpDX.Vector2> pts,
+            SharpDX.Direct2D1.Brush brush, float width, SharpDX.Direct2D1.StrokeStyle strokeStyle)
+        {
+            if (pts.Count < 2) return;
+            using (var path = new SharpDX.Direct2D1.PathGeometry(rt.Factory))
+            using (var sink = path.Open())
+            {
+                sink.BeginFigure(pts[0], SharpDX.Direct2D1.FigureBegin.Hollow);
+                for (int p = 1; p < pts.Count; p++) sink.AddLine(pts[p]);
+                sink.EndFigure(SharpDX.Direct2D1.FigureEnd.Open);
+                sink.Close();
+                rt.DrawGeometry(path, brush, width, strokeStyle);
+            }
+        }
+        
+        // Fills the polygon between two line series (topPts left→right, botPts right→left)
+        private void DrawFibFill(RenderTarget rt, List<SharpDX.Vector2> topPts,
+            List<SharpDX.Vector2> botPts, SharpDX.Direct2D1.Brush brush)
+        {
+            if (topPts.Count < 2 || botPts.Count < 2) return;
+            using (var geo  = new SharpDX.Direct2D1.PathGeometry(rt.Factory))
+            using (var sink = geo.Open())
+            {
+                sink.SetFillMode(SharpDX.Direct2D1.FillMode.Winding);
+                sink.BeginFigure(topPts[0], SharpDX.Direct2D1.FigureBegin.Filled);
+                for (int i = 1; i < topPts.Count; i++) sink.AddLine(topPts[i]);
+                for (int i = botPts.Count - 1; i >= 0; i--) sink.AddLine(botPts[i]);
+                sink.EndFigure(SharpDX.Direct2D1.FigureEnd.Closed);
+                sink.Close();
+                rt.FillGeometry(geo, brush);
+            }
+        }
+        
+        private void DrawFibLabel(RenderTarget rt, float x, float y, string text,
+            SharpDX.Direct2D1.Brush bgBrush, SharpDX.DirectWrite.TextFormat fmt)
+        {
+            using (var layout = new SharpDX.DirectWrite.TextLayout(
+                NinjaTrader.Core.Globals.DirectWriteFactory, text, fmt, 200f, 20f))
+            {
+                float tw  = layout.Metrics.Width  + 6f;
+                float th  = layout.Metrics.Height + 2f;
+                float top = y - th / 2f;
+                rt.FillRoundedRectangle(
+                    new SharpDX.Direct2D1.RoundedRectangle
+                    { Rect = new SharpDX.RectangleF(x, top, tw, th), RadiusX = 2f, RadiusY = 2f },
+                    bgBrush);
+                using (var white = new SharpDX.Direct2D1.SolidColorBrush(rt, SharpDX.Color.White))
+                    rt.DrawTextLayout(new SharpDX.Vector2(x + 3f, top + 1f), layout, white);
+            }
+        }
+        
         #endregion
 
         #region Properties
@@ -2336,7 +2590,105 @@ Write-Host 'COPIED_MP3'
         [Display(Name = "Fallback Sound File", Description = "Sound file used if voice generation fails (e.g., 'Alert1.wav')", Order = 7, GroupName = "8. Voice Alerts")]
         public string AlertFallbackSound { get; set; }
         
+        // ═══════════════════════════════════════════════
+        // Session VWAP - Fib Bands
+        // ═══════════════════════════════════════════════
+        
+        [Display(Name = "Show VWAP Fib Bands", Order = 1, GroupName = "2a. Session VWAP - Fib Bands",
+                 Description = "Overlays σ-based Fibonacci extension bands on the selected VWAP. Draws ±Band1σ, ±Band2σ, and interpolated Fib sub-bands between VWAP and ±Band2σ.")]
+        public bool ShowVwapFibBands { get; set; }
+        
+        [Display(Name = "Apply To VWAP", Order = 2, GroupName = "2a. Session VWAP - Fib Bands",
+                 Description = "Which VWAP the Fib Bands are anchored to. The selected VWAP must also be enabled.")]
+        [TypeConverter(typeof(FibBandVwapTargetConverter))]
+        public string FibBandVwapTarget { get; set; }
+        
+        [Range(0.01, double.MaxValue)]
+        [Display(Name = "Band 1 Multiplier (±σ)", Order = 3, GroupName = "2a. Session VWAP - Fib Bands",
+                 Description = "Std dev multiplier for the inner mean-reversion bands (default 1.0 = ±1σ).")]
+        public double FibBand1Mult { get; set; }
+        
+        [Range(0.01, double.MaxValue)]
+        [Display(Name = "Band 2 Multiplier (±σ)", Order = 4, GroupName = "2a. Session VWAP - Fib Bands",
+                 Description = "Std dev multiplier for the outer extension bands (default 2.0 = ±2σ). Fib sub-bands interpolate between VWAP and this level.")]
+        public double FibBand2Mult { get; set; }
+        
+        [Display(Name = "Fibonacci Levels", Order = 5, GroupName = "2a. Session VWAP - Fib Bands",
+                 Description = "Comma-separated ratios interpolated between VWAP and ±Band2σ. E.g. 0.5 puts a line at ±1σ when Band2Mult=2.")]
+        public string FibBandLevelsInput { get; set; }
+        
+        [Display(Name = "Show Fill", Order = 6, GroupName = "2a. Session VWAP - Fib Bands",
+                 Description = "Shades inner zone (VWAP to ±Band1) and outer zone (±Band1 to ±Band2).")]
+        public bool ShowFibBandFill { get; set; }
+        
+        [Range(0, 100)]
+        [Display(Name = "Fill Opacity %", Order = 7, GroupName = "2a. Session VWAP - Fib Bands",
+                 Description = "Opacity of the inner fill (0=transparent, 100=solid). Outer zone renders at half this value.")]
+        public int FibBandFillOpacity { get; set; }
+        
+        [Display(Name = "Show Labels", Order = 8, GroupName = "2a. Session VWAP - Fib Bands",
+                 Description = "Shows right-edge pill labels for each band level.")]
+        public bool ShowFibBandLabels { get; set; }
+        
+        [Range(6, 20)]
+        [Display(Name = "Label Font Size", Order = 9, GroupName = "2a. Session VWAP - Fib Bands",
+                 Description = "Font size for the right-edge band labels.")]
+        public int FibBandLabelSize { get; set; }
+        
+        [XmlIgnore]
+        [Display(Name = "Band 1 Color", Order = 10, GroupName = "2a. Session VWAP - Fib Bands",
+                 Description = "Color for the ±Band1σ lines and inner fill.")]
+        public System.Windows.Media.Brush FibBand1Color { get; set; }
+        
+        [Browsable(false)]
+        public string FibBand1ColorSerialize
+        {
+            get { return Serialize.BrushToString(FibBand1Color); }
+            set { FibBand1Color = Serialize.StringToBrush(value); }
+        }
+        
+        [Display(Name = "Band 1 Line Style", Order = 11, GroupName = "2a. Session VWAP - Fib Bands")]
+        public DashStyleHelper FibBand1Style { get; set; }
+        
+        [XmlIgnore]
+        [Display(Name = "Band 2 Color", Order = 12, GroupName = "2a. Session VWAP - Fib Bands",
+                 Description = "Color for the ±Band2σ lines and outer fill.")]
+        public System.Windows.Media.Brush FibBand2Color { get; set; }
+        
+        [Browsable(false)]
+        public string FibBand2ColorSerialize
+        {
+            get { return Serialize.BrushToString(FibBand2Color); }
+            set { FibBand2Color = Serialize.StringToBrush(value); }
+        }
+        
+        [Display(Name = "Band 2 Line Style", Order = 13, GroupName = "2a. Session VWAP - Fib Bands")]
+        public DashStyleHelper FibBand2Style { get; set; }
+        
+        [XmlIgnore]
+        [Display(Name = "Fib Sub-Band Color", Order = 14, GroupName = "2a. Session VWAP - Fib Bands",
+                 Description = "Color shared by all Fibonacci sub-band lines.")]
+        public System.Windows.Media.Brush FibSubBandColor { get; set; }
+        
+        [Browsable(false)]
+        public string FibSubBandColorSerialize
+        {
+            get { return Serialize.BrushToString(FibSubBandColor); }
+            set { FibSubBandColor = Serialize.StringToBrush(value); }
+        }
+        
+        [Display(Name = "Fib Sub-Band Line Style", Order = 15, GroupName = "2a. Session VWAP - Fib Bands")]
+        public DashStyleHelper FibSubBandStyle { get; set; }
+        
         #endregion
+    }
+    
+    public class FibBandVwapTargetConverter : TypeConverter
+    {
+        public override bool GetStandardValuesSupported(ITypeDescriptorContext context) => true;
+        public override bool GetStandardValuesExclusive(ITypeDescriptorContext context) => true;
+        public override StandardValuesCollection GetStandardValues(ITypeDescriptorContext context)
+            => new StandardValuesCollection(new[] { "Session", "NY Session", "HOD", "LOD", "Month", "Year" });
     }
 }
 
