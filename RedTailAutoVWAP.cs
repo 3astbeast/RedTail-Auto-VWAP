@@ -19,7 +19,7 @@ using System.IO;
 using System.Speech.Synthesis;
 #endregion
 
-namespace NinjaTrader.NinjaScript.Indicators
+namespace NinjaTrader.NinjaScript.Indicators.RedTail
 {
     public class RedTailAutoVWAP : Indicator
     {
@@ -183,7 +183,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 Description = @"RedTail Auto VWAP - Automatic VWAPs & Key Levels for futures trading. Features NY Session VWAP, Previous Day NY VWAP, Daily VWAP, High/Low of Day VWAPs, Monthly/Yearly VWAPs, Opening Range, and Initial Balance Range.";
                 Name = "RedTail Auto VWAP";
-                Calculate = Calculate.OnBarClose;
+                Calculate = Calculate.OnEachTick;
                 IsOverlay = true;
                 DisplayInDataBox = true;
                 DrawOnPricePanel = true;
@@ -316,6 +316,12 @@ namespace NinjaTrader.NinjaScript.Indicators
                 FibBand2Style  = DashStyleHelper.Dash;
                 FibSubBandColor = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(140, 160, 160, 160));
                 FibSubBandStyle = DashStyleHelper.Dot;
+                
+                // Bias Zone Fill (Band1 → Band2)
+                ShowBiasZoneFill    = false;
+                BiasZoneFillOpacity = 20;
+                BiasLongColor  = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 0, 200, 100));
+                BiasShortColor = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 220, 50, 50));
             }
             else if (State == State.Configure)
             {
@@ -333,8 +339,13 @@ namespace NinjaTrader.NinjaScript.Indicators
                 try { estZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); }
                 catch { estZone = TimeZoneInfo.FindSystemTimeZoneById("America/New_York"); }
                 
-                // Get chart's exchange timezone for proper bar time conversion
-                chartZone = Bars.TradingHours.TimeZoneInfo ?? TimeZoneInfo.Local;
+                // NT8 bar Time[] values are DateTimeKind.Unspecified but always represent Eastern time
+                // as displayed in NT8 charts for US futures (CME). We set chartZone = estZone so the
+                // 3-param ConvertTime call is numerically a no-op but correctly handles DST regardless
+                // of the user's OS local timezone (e.g. UK users during the US/UK DST crossover window).
+                // Avoid Bars.TradingHours.TimeZoneInfo — CME returns Central time, which shifts session
+                // boundaries by 1 hour and causes NYO/IB/OR to fire at 08:30 instead of 09:30.
+                chartZone = estZone;
                 
                 nyVwap = new VwapData();
                 prevNyVwap = new VwapData();
@@ -387,6 +398,81 @@ namespace NinjaTrader.NinjaScript.Indicators
         {
             if (CurrentBar < 1) return;
             
+            // ═══════════════════════════════════════════════
+            // Voice Alert System (real-time, every tick)
+            // ═══════════════════════════════════════════════
+            // Run alerts on every tick so touch/approach alerts fire immediately when price
+            // hits a VWAP level, not just at bar close. Cooldown dictionary prevents spam.
+            if (EnableVoiceAlerts && State == State.Realtime)
+            {
+                double closePrice = Close[0];
+                double highPrice = High[0];
+                double lowPrice = Low[0];
+                double approachDist = ApproachTicks * TickSize;
+                
+                if (ShowNyVwap && nyVwap.IsActive && nyVwap.Value > 0)
+                    CheckVwapAlert("NYSession", "NY Session VWAP", nyVwap.Value, closePrice, highPrice, lowPrice, approachDist);
+                
+                if (ShowPrevNyVwap && prevNyVwap.IsActive && prevNyVwap.Value > 0)
+                    CheckVwapAlert("PrevNY", "Prev NY VWAP", prevNyVwap.Value, closePrice, highPrice, lowPrice, approachDist);
+                
+                if (ShowDayVwap && dayVwap.IsActive && dayVwap.Value > 0)
+                    CheckVwapAlert("Session", "Session VWAP", dayVwap.Value, closePrice, highPrice, lowPrice, approachDist);
+                
+                if (ShowPrevSessionVwap && prevSessionVwap.IsActive && prevSessionVwap.Value > 0)
+                    CheckVwapAlert("PrevSession", "Prev Session VWAP", prevSessionVwap.Value, closePrice, highPrice, lowPrice, approachDist);
+                
+                if (ShowHodVwap && hodVwap.IsActive && hodVwap.Value > 0)
+                    CheckVwapAlert("HOD", "HOD VWAP", hodVwap.Value, closePrice, highPrice, lowPrice, approachDist);
+                
+                if (ShowLodVwap && lodVwap.IsActive && lodVwap.Value > 0)
+                    CheckVwapAlert("LOD", "LOD VWAP", lodVwap.Value, closePrice, highPrice, lowPrice, approachDist);
+                
+                if (ShowMonthVwap && monthVwap.IsActive && monthVwap.Value > 0)
+                    CheckVwapAlert("Monthly", "Monthly VWAP", monthVwap.Value, closePrice, highPrice, lowPrice, approachDist);
+                
+                if (ShowYearVwap && yearVwap.IsActive && yearVwap.Value > 0)
+                    CheckVwapAlert("Yearly", "Yearly VWAP", yearVwap.Value, closePrice, highPrice, lowPrice, approachDist);
+                
+                if (ShowHoyVwap && hoyVwap.IsActive && hoyVwap.Value > 0)
+                    CheckVwapAlert("HOY", "HOY VWAP", hoyVwap.Value, closePrice, highPrice, lowPrice, approachDist);
+                
+                // ─── Band Alerts (outermost enabled band for each VWAP) ───
+                
+                if (ShowDayVwap && ShowDayBands && dayVwap.IsActive && dayVwap.Value > 0 && dayVwap.UpperBand > dayVwap.Value)
+                {
+                    double stdDev = dayVwap.UpperBand - dayVwap.Value;
+                    double outerUpper = dayVwap.Value + stdDev * DayBandMult;
+                    double outerLower = dayVwap.Value - stdDev * DayBandMult;
+                    CheckVwapAlert("SessionUpperBand", "Session vee-wop Upper Band", outerUpper, closePrice, highPrice, lowPrice, approachDist);
+                    CheckVwapAlert("SessionLowerBand", "Session vee-wop Lower Band", outerLower, closePrice, highPrice, lowPrice, approachDist);
+                }
+                
+                if (ShowHodVwap && ShowHodBands && hodVwap.IsActive && hodVwap.Value > 0 && hodVwap.UpperBand > hodVwap.Value)
+                {
+                    double stdDev = hodVwap.UpperBand - hodVwap.Value;
+                    double outerUpper = hodVwap.Value + stdDev * HodBandMult;
+                    double outerLower = hodVwap.Value - stdDev * HodBandMult;
+                    CheckVwapAlert("HODUpperBand", "HOD vee-wop Upper Band", outerUpper, closePrice, highPrice, lowPrice, approachDist);
+                    CheckVwapAlert("HODLowerBand", "HOD vee-wop Lower Band", outerLower, closePrice, highPrice, lowPrice, approachDist);
+                }
+                
+                if (ShowLodVwap && ShowLodBands && lodVwap.IsActive && lodVwap.Value > 0 && lodVwap.UpperBand > lodVwap.Value)
+                {
+                    double stdDev = lodVwap.UpperBand - lodVwap.Value;
+                    double outerUpper = lodVwap.Value + stdDev * LodBandMult;
+                    double outerLower = lodVwap.Value - stdDev * LodBandMult;
+                    CheckVwapAlert("LODUpperBand", "LOD vee-wop Upper Band", outerUpper, closePrice, highPrice, lowPrice, approachDist);
+                    CheckVwapAlert("LODLowerBand", "LOD vee-wop Lower Band", outerLower, closePrice, highPrice, lowPrice, approachDist);
+                }
+            }
+            
+            // With Calculate.OnEachTick, VWAP calculations must only run once per bar so they
+            // use final OHLCV values. The benefit over OnBarClose: the first tick of a new bar
+            // fires at bar OPEN time, so session resets and VWAP lines appear immediately at
+            // 18:00/09:30 rather than one bar late (the "starts at 18:01" off-by-one on minute charts).
+            if (!IsFirstTickOfBar) return;
+            
             double source = (Open[0] + High[0] + Low[0] + Close[0]) / 4.0; // ohlc4
             double vol = Volume[0];
             
@@ -404,52 +490,74 @@ namespace NinjaTrader.NinjaScript.Indicators
                 if (ShowHoyVwap) hoyVwap.Reset(CurrentBar);
             }
             
-            // Convert bar times to Eastern for session detection
-            // 2-param ConvertTime treats Unspecified Kind as local time, converts to destination zone
-            DateTime barTimeEst = TimeZoneInfo.ConvertTime(Time[0], estZone);
-            DateTime prevBarTimeEst = TimeZoneInfo.ConvertTime(Time[1], estZone);
+            // Convert bar times to Eastern for session detection.
+            // NT8 Time[0] is always DateTimeKind.Unspecified, so we must use the 3-param overload
+            // and explicitly specify chartZone as the source. The 2-param overload assumes the
+            // source is the OS local time zone, which breaks for users outside the US Eastern timezone.
+            DateTime barTimeEst = TimeZoneInfo.ConvertTime(
+                DateTime.SpecifyKind(Time[0], DateTimeKind.Unspecified), chartZone, estZone);
+            DateTime prevBarTimeEst = TimeZoneInfo.ConvertTime(
+                DateTime.SpecifyKind(Time[1], DateTimeKind.Unspecified), chartZone, estZone);
             
             TimeSpan barTime = barTimeEst.TimeOfDay;
             TimeSpan prevBarTime = prevBarTimeEst.TimeOfDay;
             
             // ─── Session Detection ───
             
-            // For time-based charts, estimate bar open time from close time
-            // NT8 Time[0] is bar CLOSE time. Bar open ≈ Time[0] - period
-            // For non-time-based charts (tick/range), use Time[0] as-is
-            TimeSpan barOpenTime = barTime;
+            // NT8 Time[0] is always the bar CLOSE time. For time-based charts this means the bar
+            // that opens at 18:00 closes at 18:01 (1-min) or 18:05 (5-min), so a naïve open-time
+            // estimate of (close - period) works for most bars but NOT for session boundaries on
+            // non-tick/range charts because NT8 delivers the boundary bar late.
+            //
+            // Better approach: use the close time directly for session membership and edge detection.
+            // A bar "belongs" to a session if its close time is > sessionStart (i.e. the bar that
+            // closes AT 18:01 opened AT 18:00, so it is the first bar of the new session).
+            // For tick/range charts Time[0] is effectively open~=close so open-time subtraction
+            // is skipped and close-time comparison is exact.
+            
+            TimeSpan barOpenTime  = barTime;
             TimeSpan prevBarOpenTime = prevBarTime;
+            TimeSpan period = TimeSpan.Zero;
+            
             if (BarsPeriod.BarsPeriodType == BarsPeriodType.Minute)
-            {
-                TimeSpan period = TimeSpan.FromMinutes(BarsPeriod.Value);
-                barOpenTime = barTime - period;
-                prevBarOpenTime = prevBarTime - period;
-            }
+                period = TimeSpan.FromMinutes(BarsPeriod.Value);
             else if (BarsPeriod.BarsPeriodType == BarsPeriodType.Second)
+                period = TimeSpan.FromSeconds(BarsPeriod.Value);
+            
+            if (period > TimeSpan.Zero)
             {
-                TimeSpan period = TimeSpan.FromSeconds(BarsPeriod.Value);
-                barOpenTime = barTime - period;
-                prevBarOpenTime = prevBarTime - period;
+                barOpenTime      = barTime      - period;
+                prevBarOpenTime  = prevBarTime  - period;
             }
+            
+            // For session MEMBERSHIP we still use open time (correct for all non-boundary bars).
+            // For session TRANSITION detection we compare close times: if the current bar's close
+            // time is > sessionStart and the previous bar's close time is <= sessionStart, this
+            // bar is the first bar of the new session regardless of chart type.
+            // This naturally handles the NT8 "off-by-one" on minute/second charts because the
+            // boundary bar's close time lands exactly at (sessionStart + period).
             
             bool isNySession = barOpenTime >= new TimeSpan(9, 30, 0) && barOpenTime < new TimeSpan(16, 0, 0);
             
             bool isNyRangeTime = barOpenTime >= NyOpeningRangeStart.TimeOfDay && barOpenTime < NyOpeningRangeEnd.TimeOfDay;
-            bool isDayIBTime = barOpenTime >= DayIBStart.TimeOfDay && barOpenTime < DayIBEnd.TimeOfDay;
+            bool isDayIBTime   = barOpenTime >= DayIBStart.TimeOfDay && barOpenTime < DayIBEnd.TimeOfDay;
             
-            // Detect new NY session start (first bar at or after 9:30)
-            bool newNySession = isNySession && barOpenTime >= new TimeSpan(9, 30, 0) && 
+            // Detect new NY session: current bar close > 9:30, previous bar close <= 9:30
+            bool newNySession = isNySession &&
                                 (prevBarOpenTime < new TimeSpan(9, 30, 0) || barTimeEst.Date != prevBarTimeEst.Date);
             
-            // Detect new NY range session start
-            bool newNyRange = isNyRangeTime && 
+            // Detect new NY range start
+            bool newNyRange = isNyRangeTime &&
                               (prevBarOpenTime < NyOpeningRangeStart.TimeOfDay || barTimeEst.Date != prevBarTimeEst.Date);
             
-            bool newDayIB = isDayIBTime && 
+            // Detect new IB start
+            bool newDayIB = isDayIBTime &&
                             (prevBarOpenTime < DayIBStart.TimeOfDay || barTimeEst.Date != prevBarTimeEst.Date);
             
-            // Detect new futures session (6:00 PM ET start)
-            bool newSession = barOpenTime >= new TimeSpan(18, 0, 0) && 
+            // Detect new futures session (18:00 ET).
+            // Uses barOpenTime (close - period) so the 18:00 open bar is correctly identified
+            // as the first bar of the new session on both time-based and tick/range charts.
+            bool newSession = barOpenTime >= new TimeSpan(18, 0, 0) &&
                               (prevBarOpenTime < new TimeSpan(18, 0, 0) || barTimeEst.Date != prevBarTimeEst.Date);
             
             
@@ -703,75 +811,6 @@ namespace NinjaTrader.NinjaScript.Indicators
                 }
             }
             
-            // ═══════════════════════════════════════════════
-            // Voice Alert System (real-time only)
-            // ═══════════════════════════════════════════════
-            if (EnableVoiceAlerts && State == State.Realtime && IsFirstTickOfBar)
-            {
-                double closePrice = Close[0];
-                double highPrice = High[0];
-                double lowPrice = Low[0];
-                double approachDist = ApproachTicks * TickSize;
-                
-                if (ShowNyVwap && nyVwap.IsActive && nyVwap.Value > 0)
-                    CheckVwapAlert("NYSession", "NY Session VWAP", nyVwap.Value, closePrice, highPrice, lowPrice, approachDist);
-                
-                if (ShowPrevNyVwap && prevNyVwap.IsActive && prevNyVwap.Value > 0)
-                    CheckVwapAlert("PrevNY", "Prev NY VWAP", prevNyVwap.Value, closePrice, highPrice, lowPrice, approachDist);
-                
-                if (ShowDayVwap && dayVwap.IsActive && dayVwap.Value > 0)
-                    CheckVwapAlert("Session", "Session VWAP", dayVwap.Value, closePrice, highPrice, lowPrice, approachDist);
-                
-                if (ShowPrevSessionVwap && prevSessionVwap.IsActive && prevSessionVwap.Value > 0)
-                    CheckVwapAlert("PrevSession", "Prev Session VWAP", prevSessionVwap.Value, closePrice, highPrice, lowPrice, approachDist);
-                
-                if (ShowHodVwap && hodVwap.IsActive && hodVwap.Value > 0)
-                    CheckVwapAlert("HOD", "HOD VWAP", hodVwap.Value, closePrice, highPrice, lowPrice, approachDist);
-                
-                if (ShowLodVwap && lodVwap.IsActive && lodVwap.Value > 0)
-                    CheckVwapAlert("LOD", "LOD VWAP", lodVwap.Value, closePrice, highPrice, lowPrice, approachDist);
-                
-                if (ShowMonthVwap && monthVwap.IsActive && monthVwap.Value > 0)
-                    CheckVwapAlert("Monthly", "Monthly VWAP", monthVwap.Value, closePrice, highPrice, lowPrice, approachDist);
-                
-                if (ShowYearVwap && yearVwap.IsActive && yearVwap.Value > 0)
-                    CheckVwapAlert("Yearly", "Yearly VWAP", yearVwap.Value, closePrice, highPrice, lowPrice, approachDist);
-                
-                if (ShowHoyVwap && hoyVwap.IsActive && hoyVwap.Value > 0)
-                    CheckVwapAlert("HOY", "HOY VWAP", hoyVwap.Value, closePrice, highPrice, lowPrice, approachDist);
-                
-                // ─── Band Alerts (outermost enabled band for each VWAP) ───
-                
-                // Session VWAP bands
-                if (ShowDayVwap && ShowDayBands && dayVwap.IsActive && dayVwap.Value > 0 && dayVwap.UpperBand > dayVwap.Value)
-                {
-                    double stdDev = dayVwap.UpperBand - dayVwap.Value;
-                    double outerUpper = dayVwap.Value + stdDev * DayBandMult;
-                    double outerLower = dayVwap.Value - stdDev * DayBandMult;
-                    CheckVwapAlert("SessionUpperBand", "Session vee-wop Upper Band", outerUpper, closePrice, highPrice, lowPrice, approachDist);
-                    CheckVwapAlert("SessionLowerBand", "Session vee-wop Lower Band", outerLower, closePrice, highPrice, lowPrice, approachDist);
-                }
-                
-                // HOD VWAP bands
-                if (ShowHodVwap && ShowHodBands && hodVwap.IsActive && hodVwap.Value > 0 && hodVwap.UpperBand > hodVwap.Value)
-                {
-                    double stdDev = hodVwap.UpperBand - hodVwap.Value;
-                    double outerUpper = hodVwap.Value + stdDev * HodBandMult;
-                    double outerLower = hodVwap.Value - stdDev * HodBandMult;
-                    CheckVwapAlert("HODUpperBand", "HOD vee-wop Upper Band", outerUpper, closePrice, highPrice, lowPrice, approachDist);
-                    CheckVwapAlert("HODLowerBand", "HOD vee-wop Lower Band", outerLower, closePrice, highPrice, lowPrice, approachDist);
-                }
-                
-                // LOD VWAP bands
-                if (ShowLodVwap && ShowLodBands && lodVwap.IsActive && lodVwap.Value > 0 && lodVwap.UpperBand > lodVwap.Value)
-                {
-                    double stdDev = lodVwap.UpperBand - lodVwap.Value;
-                    double outerUpper = lodVwap.Value + stdDev * LodBandMult;
-                    double outerLower = lodVwap.Value - stdDev * LodBandMult;
-                    CheckVwapAlert("LODUpperBand", "LOD vee-wop Upper Band", outerUpper, closePrice, highPrice, lowPrice, approachDist);
-                    CheckVwapAlert("LODLowerBand", "LOD vee-wop Lower Band", outerLower, closePrice, highPrice, lowPrice, approachDist);
-                }
-            }
         }
         
         #region Helper Methods
@@ -1356,6 +1395,10 @@ Write-Host 'COPIED_MP3'
                         RenderVwapBandLine(renderTarget, chartControl, chartScale, dayVwap, b, true, DayBandColor, DayBandStyle, 1, firstBarVisible, lastBarVisible);
                         RenderVwapBandLine(renderTarget, chartControl, chartScale, dayVwap, b, false, DayBandColor, DayBandStyle, 1, firstBarVisible, lastBarVisible);
                     }
+                    if (ShowBiasZoneFill && DayBandMult >= 2)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, dayVwap, 1, 2, firstBarVisible, lastBarVisible);
+                    else if (ShowBiasZoneFill && DayBandMult >= 1)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, dayVwap, 1, 1, firstBarVisible, lastBarVisible);
                 }
             }
             
@@ -1389,6 +1432,10 @@ Write-Host 'COPIED_MP3'
                         RenderVwapBandLine(renderTarget, chartControl, chartScale, hodVwap, b, true, HodBandColor, HodBandStyle, 1, firstBarVisible, lastBarVisible);
                         RenderVwapBandLine(renderTarget, chartControl, chartScale, hodVwap, b, false, HodBandColor, HodBandStyle, 1, firstBarVisible, lastBarVisible);
                     }
+                    if (ShowBiasZoneFill && HodBandMult >= 2)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, hodVwap, 1, 2, firstBarVisible, lastBarVisible);
+                    else if (ShowBiasZoneFill && HodBandMult >= 1)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, hodVwap, 1, 1, firstBarVisible, lastBarVisible);
                 }
             }
             
@@ -1404,6 +1451,10 @@ Write-Host 'COPIED_MP3'
                         RenderVwapBandLine(renderTarget, chartControl, chartScale, lodVwap, b, true, LodBandColor, LodBandStyle, 1, firstBarVisible, lastBarVisible);
                         RenderVwapBandLine(renderTarget, chartControl, chartScale, lodVwap, b, false, LodBandColor, LodBandStyle, 1, firstBarVisible, lastBarVisible);
                     }
+                    if (ShowBiasZoneFill && LodBandMult >= 2)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, lodVwap, 1, 2, firstBarVisible, lastBarVisible);
+                    else if (ShowBiasZoneFill && LodBandMult >= 1)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, lodVwap, 1, 1, firstBarVisible, lastBarVisible);
                 }
             }
             
@@ -1563,7 +1614,8 @@ Write-Host 'COPIED_MP3'
                     // For NY session VWAPs, break segments outside session
                     if (nySessionOnly)
                     {
-                        DateTime barTimeEst = TimeZoneInfo.ConvertTime(Bars.GetTime(i), estZone);
+                        DateTime barTimeEst = TimeZoneInfo.ConvertTime(
+                            DateTime.SpecifyKind(Bars.GetTime(i), DateTimeKind.Unspecified), chartZone, estZone);
                         TimeSpan tod = barTimeEst.TimeOfDay;
                         
                         // Estimate bar open time for proper multi-timeframe support
@@ -2045,6 +2097,22 @@ Write-Host 'COPIED_MP3'
                     DrawFibFill(renderTarget, ptsL1, ptsL2, fillOuter);
                 }
                 
+                // ── Bias zone fill (Band1 → Band2): long zone above, short zone below ──
+                if (ShowBiasZoneFill)
+                {
+                    float biasAlpha = Math.Max(0, Math.Min(100, BiasZoneFillOpacity)) / 100f;
+                    SharpDX.Color4 cLong  = BrushToColor4(BiasLongColor);
+                    SharpDX.Color4 cShort = BrushToColor4(BiasShortColor);
+                    using (var fillLong  = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, new SharpDX.Color4(cLong.Red,  cLong.Green,  cLong.Blue,  biasAlpha)))
+                    using (var fillShort = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, new SharpDX.Color4(cShort.Red, cShort.Green, cShort.Blue, biasAlpha)))
+                    {
+                        // Long bias: above +Band1 up to +Band2
+                        DrawFibFill(renderTarget, ptsU2, ptsU1, fillLong);
+                        // Short bias: below -Band1 down to -Band2
+                        DrawFibFill(renderTarget, ptsL1, ptsL2, fillShort);
+                    }
+                }
+                
                 // ── Band lines ──
                 DrawFibLine(renderTarget, ptsU1, brushU1, 1.5f, ss1);
                 DrawFibLine(renderTarget, ptsL1, brushU1, 1.5f, ss1);
@@ -2081,6 +2149,71 @@ Write-Host 'COPIED_MP3'
                                 fibBandLevels[f].ToString("0.000"), brushFib, labelTextFmt);
                     }
                 }
+            }
+            
+            renderTarget.AntialiasMode = oldAA;
+        }
+        
+        // ── Render bias zone fill between two std-dev multiplier bands ──────────────────
+        // longMultInner/Outer: the band multipliers to fill between (e.g. 1 and 2).
+        // Fills +inner→+outer with BiasLongColor and -inner→-outer with BiasShortColor.
+        private void RenderBandZoneFill(RenderTarget renderTarget, ChartControl chartControl, ChartScale chartScale,
+            VwapData vwap, double innerMult, double outerMult, int firstBar, int lastBar, int maxBar = -1)
+        {
+            if (!vwap.IsActive || vwap.AnchorBar < 0) return;
+            
+            int endBar = Math.Min(CurrentBar, lastBar);
+            if (maxBar >= 0) endBar = Math.Min(endBar, maxBar);
+            if (vwap.AnchorBar >= endBar) return;
+            
+            var ptsUpperInner = new List<SharpDX.Vector2>();
+            var ptsUpperOuter = new List<SharpDX.Vector2>();
+            var ptsLowerInner = new List<SharpDX.Vector2>();
+            var ptsLowerOuter = new List<SharpDX.Vector2>();
+            
+            double cumVol = 0, cumTypVol = 0, cumVolSq = 0;
+            
+            for (int i = vwap.AnchorBar; i <= endBar; i++)
+            {
+                int barsAgo = CurrentBar - i;
+                if (barsAgo < 0 || barsAgo >= Bars.Count) continue;
+                
+                double vol = Volume.GetValueAt(i);
+                double src = (Open.GetValueAt(i) + High.GetValueAt(i) + Low.GetValueAt(i) + Close.GetValueAt(i)) / 4.0;
+                cumVol    += vol;
+                cumTypVol += src * vol;
+                cumVolSq  += src * src * vol;
+                if (cumVol <= 0) continue;
+                
+                double vwapVal  = cumTypVol / cumVol;
+                double variance = (cumVolSq / cumVol) - (vwapVal * vwapVal);
+                double stdDev   = variance > 0 ? Math.Sqrt(variance) : 0;
+                
+                if (i < firstBar) continue;
+                
+                float x = chartControl.GetXByBarIndex(ChartBars, i);
+                ptsUpperInner.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(vwapVal + innerMult * stdDev)));
+                ptsUpperOuter.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(vwapVal + outerMult * stdDev)));
+                ptsLowerInner.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(vwapVal - innerMult * stdDev)));
+                ptsLowerOuter.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(vwapVal - outerMult * stdDev)));
+            }
+            
+            if (ptsUpperInner.Count < 2) return;
+            
+            float biasAlpha = Math.Max(0, Math.Min(100, BiasZoneFillOpacity)) / 100f;
+            SharpDX.Color4 cLong  = BrushToColor4(BiasLongColor);
+            SharpDX.Color4 cShort = BrushToColor4(BiasShortColor);
+            
+            var oldAA = renderTarget.AntialiasMode;
+            renderTarget.AntialiasMode = SharpDX.Direct2D1.AntialiasMode.PerPrimitive;
+            
+            using (var fillLong  = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, new SharpDX.Color4(cLong.Red,  cLong.Green,  cLong.Blue,  biasAlpha)))
+            using (var fillShort = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, new SharpDX.Color4(cShort.Red, cShort.Green, cShort.Blue, biasAlpha)))
+            {
+                // Long zone: +innerMult σ → +outerMult σ
+                DrawFibFill(renderTarget, ptsUpperOuter, ptsUpperInner, fillLong);
+                // Short zone: -innerMult σ → -outerMult σ
+                DrawFibFill(renderTarget, ptsLowerInner, ptsLowerOuter, fillShort);
             }
             
             renderTarget.AntialiasMode = oldAA;
@@ -2680,6 +2813,45 @@ Write-Host 'COPIED_MP3'
         [Display(Name = "Fib Sub-Band Line Style", Order = 15, GroupName = "2a. Session VWAP - Fib Bands")]
         public DashStyleHelper FibSubBandStyle { get; set; }
         
+        // ═══════════════════════════════════════════════
+        // Bias Zone Fill
+        // ═══════════════════════════════════════════════
+        
+        [Display(Name = "Show Bias Zone Fill", Order = 1, GroupName = "2b. Bias Zone Fill",
+                 Description = "Fills the zone between Band 1 and Band 2 with directional bias colors. " +
+                               "Green above +1σ (long bias), red below -1σ (short bias). " +
+                               "Works with both standard VWAP bands and Fib Bands.")]
+        public bool ShowBiasZoneFill { get; set; }
+        
+        [Range(0, 100)]
+        [Display(Name = "Fill Opacity %", Order = 2, GroupName = "2b. Bias Zone Fill",
+                 Description = "Opacity of the bias zone fill (0=transparent, 100=solid).")]
+        public int BiasZoneFillOpacity { get; set; }
+        
+        [XmlIgnore]
+        [Display(Name = "Long Bias Color (+1σ to +2σ)", Order = 3, GroupName = "2b. Bias Zone Fill",
+                 Description = "Fill color for the zone above +Band1 up to +Band2 — your long-only zone.")]
+        public System.Windows.Media.Brush BiasLongColor { get; set; }
+        
+        [Browsable(false)]
+        public string BiasLongColorSerialize
+        {
+            get { return Serialize.BrushToString(BiasLongColor); }
+            set { BiasLongColor = Serialize.StringToBrush(value); }
+        }
+        
+        [XmlIgnore]
+        [Display(Name = "Short Bias Color (-1σ to -2σ)", Order = 4, GroupName = "2b. Bias Zone Fill",
+                 Description = "Fill color for the zone below -Band1 down to -Band2 — your short-only zone.")]
+        public System.Windows.Media.Brush BiasShortColor { get; set; }
+        
+        [Browsable(false)]
+        public string BiasShortColorSerialize
+        {
+            get { return Serialize.BrushToString(BiasShortColor); }
+            set { BiasShortColor = Serialize.StringToBrush(value); }
+        }
+        
         #endregion
     }
     
@@ -2698,19 +2870,19 @@ namespace NinjaTrader.NinjaScript.Indicators
 {
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
-		private RedTailAutoVWAP[] cacheRedTailAutoVWAP;
-		public RedTailAutoVWAP RedTailAutoVWAP(bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
+		private RedTail.RedTailAutoVWAP[] cacheRedTailAutoVWAP;
+		public RedTail.RedTailAutoVWAP RedTailAutoVWAP(bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
 		{
 			return RedTailAutoVWAP(Input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
 		}
 
-		public RedTailAutoVWAP RedTailAutoVWAP(ISeries<double> input, bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
+		public RedTail.RedTailAutoVWAP RedTailAutoVWAP(ISeries<double> input, bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
 		{
 			if (cacheRedTailAutoVWAP != null)
 				for (int idx = 0; idx < cacheRedTailAutoVWAP.Length; idx++)
 					if (cacheRedTailAutoVWAP[idx] != null && cacheRedTailAutoVWAP[idx].ShowNyVwap == showNyVwap && cacheRedTailAutoVWAP[idx].ShowPrevNyVwap == showPrevNyVwap && cacheRedTailAutoVWAP[idx].ShowDayVwap == showDayVwap && cacheRedTailAutoVWAP[idx].ShowHodVwap == showHodVwap && cacheRedTailAutoVWAP[idx].ShowLodVwap == showLodVwap && cacheRedTailAutoVWAP[idx].ShowMonthVwap == showMonthVwap && cacheRedTailAutoVWAP[idx].ShowYearVwap == showYearVwap && cacheRedTailAutoVWAP[idx].ShowHoyVwap == showHoyVwap && cacheRedTailAutoVWAP[idx].ShowNyOpeningRange == showNyOpeningRange && cacheRedTailAutoVWAP[idx].ShowDayInitialBalance == showDayInitialBalance && cacheRedTailAutoVWAP[idx].EqualsInput(input))
 						return cacheRedTailAutoVWAP[idx];
-			return CacheIndicator<RedTailAutoVWAP>(new RedTailAutoVWAP(){ ShowNyVwap = showNyVwap, ShowPrevNyVwap = showPrevNyVwap, ShowDayVwap = showDayVwap, ShowHodVwap = showHodVwap, ShowLodVwap = showLodVwap, ShowMonthVwap = showMonthVwap, ShowYearVwap = showYearVwap, ShowHoyVwap = showHoyVwap, ShowNyOpeningRange = showNyOpeningRange, ShowDayInitialBalance = showDayInitialBalance }, input, ref cacheRedTailAutoVWAP);
+			return CacheIndicator<RedTail.RedTailAutoVWAP>(new RedTail.RedTailAutoVWAP(){ ShowNyVwap = showNyVwap, ShowPrevNyVwap = showPrevNyVwap, ShowDayVwap = showDayVwap, ShowHodVwap = showHodVwap, ShowLodVwap = showLodVwap, ShowMonthVwap = showMonthVwap, ShowYearVwap = showYearVwap, ShowHoyVwap = showHoyVwap, ShowNyOpeningRange = showNyOpeningRange, ShowDayInitialBalance = showDayInitialBalance }, input, ref cacheRedTailAutoVWAP);
 		}
 	}
 }
@@ -2719,12 +2891,12 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.RedTailAutoVWAP RedTailAutoVWAP(bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
+		public Indicators.RedTail.RedTailAutoVWAP RedTailAutoVWAP(bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
 		{
 			return indicator.RedTailAutoVWAP(Input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
 		}
 
-		public Indicators.RedTailAutoVWAP RedTailAutoVWAP(ISeries<double> input , bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
+		public Indicators.RedTail.RedTailAutoVWAP RedTailAutoVWAP(ISeries<double> input , bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
 		{
 			return indicator.RedTailAutoVWAP(input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
 		}
@@ -2735,12 +2907,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.RedTailAutoVWAP RedTailAutoVWAP(bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
+		public Indicators.RedTail.RedTailAutoVWAP RedTailAutoVWAP(bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
 		{
 			return indicator.RedTailAutoVWAP(Input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
 		}
 
-		public Indicators.RedTailAutoVWAP RedTailAutoVWAP(ISeries<double> input , bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
+		public Indicators.RedTail.RedTailAutoVWAP RedTailAutoVWAP(ISeries<double> input , bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
 		{
 			return indicator.RedTailAutoVWAP(input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
 		}
