@@ -116,7 +116,10 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
         private VwapData dayVwap;
         private VwapData hodVwap;
         private VwapData lodVwap;
+        private VwapData weekVwap;
         private VwapData monthVwap;
+        private VwapData quarterVwap;   // 3-month rolling
+        private VwapData semiVwap;      // 6-month rolling
         private VwapData yearVwap;
         private VwapData hoyVwap;
         
@@ -125,6 +128,7 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
         private List<HistoricalVwap> dayVwapHistory;
         private List<HistoricalVwap> dayBandUpperHistory;
         private List<HistoricalVwap> dayBandLowerHistory;
+        private List<HistoricalVwap> weekVwapHistory;
         private List<HistoricalVwap> monthVwapHistory;
         private List<HistoricalVwap> yearVwapHistory;
         
@@ -239,17 +243,53 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                 LodBandColor = Brushes.Purple;
                 LodBandStyle = DashStyleHelper.Solid;
                 
+                // Week VWAP
+                ShowWeekVwap = false;
+                WeekVwapColor = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(255, 70, 130, 180)); // SteelBlue
+                WeekVwapStyle = DashStyleHelper.Solid;
+                WeekVwapHistoryCount = 0;
+                ShowWeekBands = false;
+                WeekBandMult = 1;
+                WeekBandColor = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(128, 70, 130, 180));
+                WeekBandStyle = DashStyleHelper.Solid;
+                
                 // Month VWAP
                 ShowMonthVwap = false;
                 MonthVwapColor = Brushes.Black;
                 MonthVwapStyle = DashStyleHelper.Solid;
                 MonthVwapHistoryCount = 0;
+                ShowMonthBands = false;
+                MonthBandMult = 1;
+                MonthBandColor = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(128, 128, 128, 128));
+                MonthBandStyle = DashStyleHelper.Solid;
+                
+                // 3-Month (Quarter) Rolling VWAP
+                ShowQuarterVwap = false;
+                QuarterVwapColor = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(255, 218, 165, 32)); // Goldenrod
+                QuarterVwapStyle = DashStyleHelper.Solid;
+                ShowQuarterBands = false;
+                QuarterBandMult = 1;
+                QuarterBandColor = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(128, 218, 165, 32));
+                QuarterBandStyle = DashStyleHelper.Solid;
+                
+                // 6-Month (Semi) Rolling VWAP
+                ShowSemiVwap = false;
+                SemiVwapColor = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(255, 184, 134, 11)); // DarkGoldenrod
+                SemiVwapStyle = DashStyleHelper.Solid;
+                ShowSemiBands = false;
+                SemiBandMult = 1;
+                SemiBandColor = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(128, 184, 134, 11));
+                SemiBandStyle = DashStyleHelper.Solid;
                 
                 // Year VWAP
                 ShowYearVwap = false;
                 YearVwapColor = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(255, 200, 230, 201));
                 YearVwapStyle = DashStyleHelper.Solid;
                 YearVwapHistoryCount = 0;
+                ShowYearBands = false;
+                YearBandMult = 1;
+                YearBandColor = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(128, 200, 230, 201));
+                YearBandStyle = DashStyleHelper.Solid;
                 
                 // HOY VWAP
                 ShowHoyVwap = false;
@@ -290,6 +330,22 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                 // VWAP Labels
                 ShowVwapLabels = false;
                 VwapLabelFontSize = 10;
+                ExtendBarsRight = 2;
+                
+                // Right-Edge Stub Mode (group 5 — all default OFF, user opts in per VWAP)
+                StubLengthBars = 20;
+                NyStubMode = false;
+                PrevNyStubMode = false;
+                DayStubMode = false;        DayStubBands = false;
+                PrevSessionStubMode = false; PrevSessionStubBands = false;
+                HodStubMode = false;        HodStubBands = false;
+                LodStubMode = false;        LodStubBands = false;
+                WeekStubMode = false;       WeekStubBands = false;
+                MonthStubMode = false;      MonthStubBands = false;
+                QuarterStubMode = false;    QuarterStubBands = false;
+                SemiStubMode = false;       SemiStubBands = false;
+                YearStubMode = false;       YearStubBands = false;
+                HoyStubMode = false;
                 
                 // Voice Alerts
                 EnableVoiceAlerts = true;
@@ -355,7 +411,10 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                 dayVwap = new VwapData();
                 hodVwap = new VwapData();
                 lodVwap = new VwapData();
+                weekVwap = new VwapData();
                 monthVwap = new VwapData();
+                quarterVwap = new VwapData();
+                semiVwap = new VwapData();
                 yearVwap = new VwapData();
                 hoyVwap = new VwapData();
                 
@@ -363,6 +422,7 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                 dayVwapHistory = new List<HistoricalVwap>();
                 dayBandUpperHistory = new List<HistoricalVwap>();
                 dayBandLowerHistory = new List<HistoricalVwap>();
+                weekVwapHistory = new List<HistoricalVwap>();
                 monthVwapHistory = new List<HistoricalVwap>();
                 yearVwapHistory = new List<HistoricalVwap>();
                 
@@ -428,8 +488,17 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                 if (ShowLodVwap && lodVwap.IsActive && lodVwap.Value > 0)
                     CheckVwapAlert("LOD", "LOD VWAP", lodVwap.Value, closePrice, highPrice, lowPrice, approachDist);
                 
+                if (ShowWeekVwap && weekVwap.IsActive && weekVwap.Value > 0)
+                    CheckVwapAlert("Weekly", "Weekly VWAP", weekVwap.Value, closePrice, highPrice, lowPrice, approachDist);
+                
                 if (ShowMonthVwap && monthVwap.IsActive && monthVwap.Value > 0)
                     CheckVwapAlert("Monthly", "Monthly VWAP", monthVwap.Value, closePrice, highPrice, lowPrice, approachDist);
+                
+                if (ShowQuarterVwap && quarterVwap.IsActive && quarterVwap.Value > 0)
+                    CheckVwapAlert("Quarter", "3-Month VWAP", quarterVwap.Value, closePrice, highPrice, lowPrice, approachDist);
+                
+                if (ShowSemiVwap && semiVwap.IsActive && semiVwap.Value > 0)
+                    CheckVwapAlert("Semi", "6-Month VWAP", semiVwap.Value, closePrice, highPrice, lowPrice, approachDist);
                 
                 if (ShowYearVwap && yearVwap.IsActive && yearVwap.Value > 0)
                     CheckVwapAlert("Yearly", "Yearly VWAP", yearVwap.Value, closePrice, highPrice, lowPrice, approachDist);
@@ -465,6 +534,51 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                     CheckVwapAlert("LODUpperBand", "LOD vee-wop Upper Band", outerUpper, closePrice, highPrice, lowPrice, approachDist);
                     CheckVwapAlert("LODLowerBand", "LOD vee-wop Lower Band", outerLower, closePrice, highPrice, lowPrice, approachDist);
                 }
+                
+                if (ShowWeekVwap && ShowWeekBands && weekVwap.IsActive && weekVwap.Value > 0 && weekVwap.UpperBand > weekVwap.Value)
+                {
+                    double stdDev = weekVwap.UpperBand - weekVwap.Value;
+                    double outerUpper = weekVwap.Value + stdDev * WeekBandMult;
+                    double outerLower = weekVwap.Value - stdDev * WeekBandMult;
+                    CheckVwapAlert("WeeklyUpperBand", "Weekly vee-wop Upper Band", outerUpper, closePrice, highPrice, lowPrice, approachDist);
+                    CheckVwapAlert("WeeklyLowerBand", "Weekly vee-wop Lower Band", outerLower, closePrice, highPrice, lowPrice, approachDist);
+                }
+                
+                if (ShowMonthVwap && ShowMonthBands && monthVwap.IsActive && monthVwap.Value > 0 && monthVwap.UpperBand > monthVwap.Value)
+                {
+                    double stdDev = monthVwap.UpperBand - monthVwap.Value;
+                    double outerUpper = monthVwap.Value + stdDev * MonthBandMult;
+                    double outerLower = monthVwap.Value - stdDev * MonthBandMult;
+                    CheckVwapAlert("MonthlyUpperBand", "Monthly vee-wop Upper Band", outerUpper, closePrice, highPrice, lowPrice, approachDist);
+                    CheckVwapAlert("MonthlyLowerBand", "Monthly vee-wop Lower Band", outerLower, closePrice, highPrice, lowPrice, approachDist);
+                }
+                
+                if (ShowQuarterVwap && ShowQuarterBands && quarterVwap.IsActive && quarterVwap.Value > 0 && quarterVwap.UpperBand > quarterVwap.Value)
+                {
+                    double stdDev = quarterVwap.UpperBand - quarterVwap.Value;
+                    double outerUpper = quarterVwap.Value + stdDev * QuarterBandMult;
+                    double outerLower = quarterVwap.Value - stdDev * QuarterBandMult;
+                    CheckVwapAlert("QuarterUpperBand", "3-Month vee-wop Upper Band", outerUpper, closePrice, highPrice, lowPrice, approachDist);
+                    CheckVwapAlert("QuarterLowerBand", "3-Month vee-wop Lower Band", outerLower, closePrice, highPrice, lowPrice, approachDist);
+                }
+                
+                if (ShowSemiVwap && ShowSemiBands && semiVwap.IsActive && semiVwap.Value > 0 && semiVwap.UpperBand > semiVwap.Value)
+                {
+                    double stdDev = semiVwap.UpperBand - semiVwap.Value;
+                    double outerUpper = semiVwap.Value + stdDev * SemiBandMult;
+                    double outerLower = semiVwap.Value - stdDev * SemiBandMult;
+                    CheckVwapAlert("SemiUpperBand", "6-Month vee-wop Upper Band", outerUpper, closePrice, highPrice, lowPrice, approachDist);
+                    CheckVwapAlert("SemiLowerBand", "6-Month vee-wop Lower Band", outerLower, closePrice, highPrice, lowPrice, approachDist);
+                }
+                
+                if (ShowYearVwap && ShowYearBands && yearVwap.IsActive && yearVwap.Value > 0 && yearVwap.UpperBand > yearVwap.Value)
+                {
+                    double stdDev = yearVwap.UpperBand - yearVwap.Value;
+                    double outerUpper = yearVwap.Value + stdDev * YearBandMult;
+                    double outerLower = yearVwap.Value - stdDev * YearBandMult;
+                    CheckVwapAlert("YearlyUpperBand", "Yearly vee-wop Upper Band", outerUpper, closePrice, highPrice, lowPrice, approachDist);
+                    CheckVwapAlert("YearlyLowerBand", "Yearly vee-wop Lower Band", outerLower, closePrice, highPrice, lowPrice, approachDist);
+                }
             }
             
             // With Calculate.OnEachTick, VWAP calculations must only run once per bar so they
@@ -485,7 +599,10 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                 if (ShowDayVwap) dayVwap.Reset(CurrentBar);
                 if (ShowHodVwap) hodVwap.Reset(CurrentBar);
                 if (ShowLodVwap) lodVwap.Reset(CurrentBar);
+                if (ShowWeekVwap) weekVwap.Reset(CurrentBar);
                 if (ShowMonthVwap) monthVwap.Reset(CurrentBar);
+                if (ShowQuarterVwap) quarterVwap.Reset(CurrentBar);
+                if (ShowSemiVwap) semiVwap.Reset(CurrentBar);
                 if (ShowYearVwap) yearVwap.Reset(CurrentBar);
                 if (ShowHoyVwap) hoyVwap.Reset(CurrentBar);
             }
@@ -563,6 +680,8 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
             
             // Detect day/month/year changes
             bool newDay = barTimeEst.Date != prevBarTimeEst.Date;
+            // New CME trading week: first session rollover of a Sunday (6 PM EST Globex open)
+            bool newWeek = newSession && barTimeEst.DayOfWeek == DayOfWeek.Sunday;
             bool newMonth = barTimeEst.Month != prevBarTimeEst.Month || barTimeEst.Year != prevBarTimeEst.Year;
             bool newYear = barTimeEst.Year != prevBarTimeEst.Year;
             
@@ -709,6 +828,20 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                     lodVwap.Update(source, vol);
             }
             
+            // ─── Week VWAP ───
+            if (ShowWeekVwap)
+            {
+                if (newWeek)
+                {
+                    if (weekVwap.IsActive && WeekVwapHistoryCount > 0)
+                        SaveVwapToHistory(weekVwapHistory, weekVwap, WeekVwapHistoryCount);
+                    
+                    weekVwap.Reset(CurrentBar);
+                }
+                
+                weekVwap.Update(source, vol);
+            }
+            
             // ─── Month VWAP ───
             if (ShowMonthVwap)
             {
@@ -721,6 +854,39 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                 }
                 
                 monthVwap.Update(source, vol);
+            }
+            
+            // ─── 3-Month (Quarter) Rolling VWAP ───
+            // Anchor slides forward each new session to the bar that is ~3 calendar months back.
+            // This keeps the VWAP window a rolling 3-month period from the current day.
+            if (ShowQuarterVwap)
+            {
+                if (newSession || !quarterVwap.IsActive)
+                {
+                    DateTime cutoff = barTimeEst.AddMonths(-3);
+                    int anchor = FindAnchorBarByTime(cutoff);
+                    RebuildRollingVwap(quarterVwap, anchor);
+                }
+                else
+                {
+                    quarterVwap.Update(source, vol);
+                }
+            }
+            
+            // ─── 6-Month (Semi) Rolling VWAP ───
+            // Anchor slides forward each new session to the bar that is ~6 calendar months back.
+            if (ShowSemiVwap)
+            {
+                if (newSession || !semiVwap.IsActive)
+                {
+                    DateTime cutoff = barTimeEst.AddMonths(-6);
+                    int anchor = FindAnchorBarByTime(cutoff);
+                    RebuildRollingVwap(semiVwap, anchor);
+                }
+                else
+                {
+                    semiVwap.Update(source, vol);
+                }
             }
             
             // ─── Year VWAP ───
@@ -853,6 +1019,16 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                     props.DashOffset = 0;
                     props.DashCap = SharpDX.Direct2D1.CapStyle.Round;
                     return new SharpDX.Direct2D1.StrokeStyle(renderTarget.Factory, props, new float[] { 2f, 3f });
+                case DashStyleHelper.DashDot:
+                    // Pattern: dash, gap, dot, gap
+                    props.DashStyle = SharpDX.Direct2D1.DashStyle.Custom;
+                    props.DashOffset = 0;
+                    return new SharpDX.Direct2D1.StrokeStyle(renderTarget.Factory, props, new float[] { 6f, 3f, 1f, 3f });
+                case DashStyleHelper.DashDotDot:
+                    // Pattern: dash, gap, dot, gap, dot, gap
+                    props.DashStyle = SharpDX.Direct2D1.DashStyle.Custom;
+                    props.DashOffset = 0;
+                    return new SharpDX.Direct2D1.StrokeStyle(renderTarget.Factory, props, new float[] { 6f, 3f, 1f, 3f, 1f, 3f });
                 default:
                     props.DashStyle = SharpDX.Direct2D1.DashStyle.Solid;
                     return new SharpDX.Direct2D1.StrokeStyle(renderTarget.Factory, props);
@@ -880,12 +1056,20 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                 .Replace(" ", "")
                 .Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
             var list = new System.Collections.Generic.List<double>();
+            const double eps = 1e-6;
             foreach (var p in parts)
-                if (double.TryParse(p,
+            {
+                if (!double.TryParse(p,
                     System.Globalization.NumberStyles.Any,
                     System.Globalization.CultureInfo.InvariantCulture,
                     out double v))
-                    list.Add(v);
+                    continue;
+                // Skip invalid or trivially-colliding levels:
+                //   v <= 0  → coincides with VWAP line itself
+                //   v >= 1  → coincides with ±Band2 line
+                if (v <= eps || v >= 1.0 - eps) continue;
+                list.Add(v);
+            }
             fibBandLevels = list.ToArray();
         }
         
@@ -969,6 +1153,10 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                 { "LOD_Approach",           instrumentName + " is approaching the low of day vee-wop" },
                 { "Monthly_Touch",          instrumentName + " has touched the Monthly vee-wop" },
                 { "Monthly_Approach",       instrumentName + " is approaching the Monthly vee-wop" },
+                { "Quarter_Touch",          instrumentName + " has touched the 3-Month vee-wop" },
+                { "Quarter_Approach",       instrumentName + " is approaching the 3-Month vee-wop" },
+                { "Semi_Touch",             instrumentName + " has touched the 6-Month vee-wop" },
+                { "Semi_Approach",          instrumentName + " is approaching the 6-Month vee-wop" },
                 { "Yearly_Touch",           instrumentName + " has touched the Yearly vee-wop" },
                 { "Yearly_Approach",        instrumentName + " is approaching the Yearly vee-wop" },
                 { "HOY_Touch",              instrumentName + " has touched the high of year vee-wop" },
@@ -986,6 +1174,14 @@ namespace NinjaTrader.NinjaScript.Indicators.RedTail
                 { "LODUpperBand_Approach",      instrumentName + " is approaching the low of day vee-wop Upper Band" },
                 { "LODLowerBand_Touch",         instrumentName + " has touched the low of day vee-wop Lower Band" },
                 { "LODLowerBand_Approach",      instrumentName + " is approaching the low od day vee-wop Lower Band" },
+                { "QuarterUpperBand_Touch",     instrumentName + " has touched the 3-Month vee-wop Upper Band" },
+                { "QuarterUpperBand_Approach",  instrumentName + " is approaching the 3-Month vee-wop Upper Band" },
+                { "QuarterLowerBand_Touch",     instrumentName + " has touched the 3-Month vee-wop Lower Band" },
+                { "QuarterLowerBand_Approach",  instrumentName + " is approaching the 3-Month vee-wop Lower Band" },
+                { "SemiUpperBand_Touch",        instrumentName + " has touched the 6-Month vee-wop Upper Band" },
+                { "SemiUpperBand_Approach",     instrumentName + " is approaching the 6-Month vee-wop Upper Band" },
+                { "SemiLowerBand_Touch",        instrumentName + " has touched the 6-Month vee-wop Lower Band" },
+                { "SemiLowerBand_Approach",     instrumentName + " is approaching the 6-Month vee-wop Lower Band" },
             };
             
             int totalAlerts = alerts.Count;
@@ -1374,31 +1570,40 @@ Write-Host 'COPIED_MP3'
             
             // NY Session VWAP
             if (ShowNyVwap && nyVwap.IsActive)
-                RenderVwapLine(renderTarget, chartControl, chartScale, nyVwap, NyVwapColor, NyVwapStyle, 2, firstBarVisible, lastBarVisible, true);
+            {
+                int fb = GetStubFirstBar(NyStubMode, firstBarVisible, CurrentBar);
+                RenderVwapLine(renderTarget, chartControl, chartScale, nyVwap, NyVwapColor, NyVwapStyle, 2, fb, lastBarVisible, true);
+            }
             
             // Previous Day NY VWAP
             if (ShowPrevNyVwap && prevNyVwap.IsActive)
-                RenderVwapLine(renderTarget, chartControl, chartScale, prevNyVwap, PrevNyVwapColor, PrevNyVwapStyle, 2, firstBarVisible, lastBarVisible, true);
+            {
+                int fb = GetStubFirstBar(PrevNyStubMode, firstBarVisible, CurrentBar);
+                RenderVwapLine(renderTarget, chartControl, chartScale, prevNyVwap, PrevNyVwapColor, PrevNyVwapStyle, 2, fb, lastBarVisible, true);
+            }
             
             // Session VWAP
             if (ShowDayVwap && dayVwap.IsActive)
             {
-                if (UseDynamicSessionColor)
-                    RenderVwapLineDynamic(renderTarget, chartControl, chartScale, dayVwap, SessionVwapAboveColor, SessionVwapBelowColor, DayVwapStyle, 2, firstBarVisible, lastBarVisible);
-                else
-                    RenderVwapLine(renderTarget, chartControl, chartScale, dayVwap, DayVwapColor, DayVwapStyle, 2, firstBarVisible, lastBarVisible, false);
+                int fb = GetStubFirstBar(DayStubMode, firstBarVisible, CurrentBar);
+                bool drawBands = ShowDayBands && (!DayStubMode || DayStubBands);
                 
-                if (ShowDayBands)
+                if (UseDynamicSessionColor)
+                    RenderVwapLineDynamic(renderTarget, chartControl, chartScale, dayVwap, SessionVwapAboveColor, SessionVwapBelowColor, DayVwapStyle, 2, fb, lastBarVisible);
+                else
+                    RenderVwapLine(renderTarget, chartControl, chartScale, dayVwap, DayVwapColor, DayVwapStyle, 2, fb, lastBarVisible, false);
+                
+                if (drawBands)
                 {
                     for (int b = 1; b <= DayBandMult; b++)
                     {
-                        RenderVwapBandLine(renderTarget, chartControl, chartScale, dayVwap, b, true, DayBandColor, DayBandStyle, 1, firstBarVisible, lastBarVisible);
-                        RenderVwapBandLine(renderTarget, chartControl, chartScale, dayVwap, b, false, DayBandColor, DayBandStyle, 1, firstBarVisible, lastBarVisible);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, dayVwap, b, true, DayBandColor, DayBandStyle, 1, fb, lastBarVisible);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, dayVwap, b, false, DayBandColor, DayBandStyle, 1, fb, lastBarVisible);
                     }
                     if (ShowBiasZoneFill && DayBandMult >= 2)
-                        RenderBandZoneFill(renderTarget, chartControl, chartScale, dayVwap, 1, 2, firstBarVisible, lastBarVisible);
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, dayVwap, 1, 2, fb, lastBarVisible);
                     else if (ShowBiasZoneFill && DayBandMult >= 1)
-                        RenderBandZoneFill(renderTarget, chartControl, chartScale, dayVwap, 1, 1, firstBarVisible, lastBarVisible);
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, dayVwap, 1, 1, fb, lastBarVisible);
                 }
             }
             
@@ -1407,15 +1612,18 @@ Write-Host 'COPIED_MP3'
             {
                 // Stop at the new session start (6 PM boundary)
                 int prevSessionMaxBar = currentSessionAnchorBar > 0 ? currentSessionAnchorBar - 1 : -1;
+                int fb = GetStubFirstBar(PrevSessionStubMode, firstBarVisible,
+                    prevSessionMaxBar >= 0 ? prevSessionMaxBar : CurrentBar);
+                bool drawBands = ShowDayBands && (!PrevSessionStubMode || PrevSessionStubBands);
                 
-                RenderVwapLine(renderTarget, chartControl, chartScale, prevSessionVwap, PrevSessionVwapColor, PrevSessionVwapStyle, 2, firstBarVisible, lastBarVisible, false, prevSessionMaxBar);
+                RenderVwapLine(renderTarget, chartControl, chartScale, prevSessionVwap, PrevSessionVwapColor, PrevSessionVwapStyle, 2, fb, lastBarVisible, false, prevSessionMaxBar);
                 
-                if (ShowDayBands)
+                if (drawBands)
                 {
                     for (int b = 1; b <= DayBandMult; b++)
                     {
-                        RenderVwapBandLine(renderTarget, chartControl, chartScale, prevSessionVwap, b, true, PrevSessionBandColor, PrevSessionBandStyle, 1, firstBarVisible, lastBarVisible, prevSessionMaxBar);
-                        RenderVwapBandLine(renderTarget, chartControl, chartScale, prevSessionVwap, b, false, PrevSessionBandColor, PrevSessionBandStyle, 1, firstBarVisible, lastBarVisible, prevSessionMaxBar);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, prevSessionVwap, b, true, PrevSessionBandColor, PrevSessionBandStyle, 1, fb, lastBarVisible, prevSessionMaxBar);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, prevSessionVwap, b, false, PrevSessionBandColor, PrevSessionBandStyle, 1, fb, lastBarVisible, prevSessionMaxBar);
                     }
                 }
             }
@@ -1423,52 +1631,163 @@ Write-Host 'COPIED_MP3'
             // HOD VWAP
             if (ShowHodVwap && hodVwap.IsActive)
             {
-                RenderVwapLine(renderTarget, chartControl, chartScale, hodVwap, HodVwapColor, HodVwapStyle, 2, firstBarVisible, lastBarVisible, false);
+                int fb = GetStubFirstBar(HodStubMode, firstBarVisible, CurrentBar);
+                bool drawBands = ShowHodBands && (!HodStubMode || HodStubBands);
                 
-                if (ShowHodBands)
+                RenderVwapLine(renderTarget, chartControl, chartScale, hodVwap, HodVwapColor, HodVwapStyle, 2, fb, lastBarVisible, false);
+                
+                if (drawBands)
                 {
                     for (int b = 1; b <= HodBandMult; b++)
                     {
-                        RenderVwapBandLine(renderTarget, chartControl, chartScale, hodVwap, b, true, HodBandColor, HodBandStyle, 1, firstBarVisible, lastBarVisible);
-                        RenderVwapBandLine(renderTarget, chartControl, chartScale, hodVwap, b, false, HodBandColor, HodBandStyle, 1, firstBarVisible, lastBarVisible);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, hodVwap, b, true, HodBandColor, HodBandStyle, 1, fb, lastBarVisible);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, hodVwap, b, false, HodBandColor, HodBandStyle, 1, fb, lastBarVisible);
                     }
                     if (ShowBiasZoneFill && HodBandMult >= 2)
-                        RenderBandZoneFill(renderTarget, chartControl, chartScale, hodVwap, 1, 2, firstBarVisible, lastBarVisible);
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, hodVwap, 1, 2, fb, lastBarVisible);
                     else if (ShowBiasZoneFill && HodBandMult >= 1)
-                        RenderBandZoneFill(renderTarget, chartControl, chartScale, hodVwap, 1, 1, firstBarVisible, lastBarVisible);
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, hodVwap, 1, 1, fb, lastBarVisible);
                 }
             }
             
             // LOD VWAP
             if (ShowLodVwap && lodVwap.IsActive)
             {
-                RenderVwapLine(renderTarget, chartControl, chartScale, lodVwap, LodVwapColor, LodVwapStyle, 2, firstBarVisible, lastBarVisible, false);
+                int fb = GetStubFirstBar(LodStubMode, firstBarVisible, CurrentBar);
+                bool drawBands = ShowLodBands && (!LodStubMode || LodStubBands);
                 
-                if (ShowLodBands)
+                RenderVwapLine(renderTarget, chartControl, chartScale, lodVwap, LodVwapColor, LodVwapStyle, 2, fb, lastBarVisible, false);
+                
+                if (drawBands)
                 {
                     for (int b = 1; b <= LodBandMult; b++)
                     {
-                        RenderVwapBandLine(renderTarget, chartControl, chartScale, lodVwap, b, true, LodBandColor, LodBandStyle, 1, firstBarVisible, lastBarVisible);
-                        RenderVwapBandLine(renderTarget, chartControl, chartScale, lodVwap, b, false, LodBandColor, LodBandStyle, 1, firstBarVisible, lastBarVisible);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, lodVwap, b, true, LodBandColor, LodBandStyle, 1, fb, lastBarVisible);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, lodVwap, b, false, LodBandColor, LodBandStyle, 1, fb, lastBarVisible);
                     }
                     if (ShowBiasZoneFill && LodBandMult >= 2)
-                        RenderBandZoneFill(renderTarget, chartControl, chartScale, lodVwap, 1, 2, firstBarVisible, lastBarVisible);
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, lodVwap, 1, 2, fb, lastBarVisible);
                     else if (ShowBiasZoneFill && LodBandMult >= 1)
-                        RenderBandZoneFill(renderTarget, chartControl, chartScale, lodVwap, 1, 1, firstBarVisible, lastBarVisible);
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, lodVwap, 1, 1, fb, lastBarVisible);
+                }
+            }
+            
+            // Week VWAP
+            if (ShowWeekVwap && weekVwap.IsActive)
+            {
+                int fb = GetStubFirstBar(WeekStubMode, firstBarVisible, CurrentBar);
+                bool drawBands = ShowWeekBands && (!WeekStubMode || WeekStubBands);
+                
+                RenderVwapLine(renderTarget, chartControl, chartScale, weekVwap, WeekVwapColor, WeekVwapStyle, 2, fb, lastBarVisible, false);
+                
+                if (drawBands)
+                {
+                    for (int b = 1; b <= WeekBandMult; b++)
+                    {
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, weekVwap, b, true, WeekBandColor, WeekBandStyle, 1, fb, lastBarVisible);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, weekVwap, b, false, WeekBandColor, WeekBandStyle, 1, fb, lastBarVisible);
+                    }
+                    if (ShowBiasZoneFill && WeekBandMult >= 2)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, weekVwap, 1, 2, fb, lastBarVisible);
+                    else if (ShowBiasZoneFill && WeekBandMult >= 1)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, weekVwap, 1, 1, fb, lastBarVisible);
                 }
             }
             
             // Month VWAP
             if (ShowMonthVwap && monthVwap.IsActive)
-                RenderVwapLine(renderTarget, chartControl, chartScale, monthVwap, MonthVwapColor, MonthVwapStyle, 2, firstBarVisible, lastBarVisible, false);
+            {
+                int fb = GetStubFirstBar(MonthStubMode, firstBarVisible, CurrentBar);
+                bool drawBands = ShowMonthBands && (!MonthStubMode || MonthStubBands);
+                
+                RenderVwapLine(renderTarget, chartControl, chartScale, monthVwap, MonthVwapColor, MonthVwapStyle, 2, fb, lastBarVisible, false);
+                
+                if (drawBands)
+                {
+                    for (int b = 1; b <= MonthBandMult; b++)
+                    {
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, monthVwap, b, true, MonthBandColor, MonthBandStyle, 1, fb, lastBarVisible);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, monthVwap, b, false, MonthBandColor, MonthBandStyle, 1, fb, lastBarVisible);
+                    }
+                    if (ShowBiasZoneFill && MonthBandMult >= 2)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, monthVwap, 1, 2, fb, lastBarVisible);
+                    else if (ShowBiasZoneFill && MonthBandMult >= 1)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, monthVwap, 1, 1, fb, lastBarVisible);
+                }
+            }
+            
+            // 3-Month (Quarter) Rolling VWAP
+            if (ShowQuarterVwap && quarterVwap.IsActive)
+            {
+                int fb = GetStubFirstBar(QuarterStubMode, firstBarVisible, CurrentBar);
+                bool drawBands = ShowQuarterBands && (!QuarterStubMode || QuarterStubBands);
+                
+                RenderVwapLine(renderTarget, chartControl, chartScale, quarterVwap, QuarterVwapColor, QuarterVwapStyle, 2, fb, lastBarVisible, false);
+                
+                if (drawBands)
+                {
+                    for (int b = 1; b <= QuarterBandMult; b++)
+                    {
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, quarterVwap, b, true, QuarterBandColor, QuarterBandStyle, 1, fb, lastBarVisible);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, quarterVwap, b, false, QuarterBandColor, QuarterBandStyle, 1, fb, lastBarVisible);
+                    }
+                    if (ShowBiasZoneFill && QuarterBandMult >= 2)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, quarterVwap, 1, 2, fb, lastBarVisible);
+                    else if (ShowBiasZoneFill && QuarterBandMult >= 1)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, quarterVwap, 1, 1, fb, lastBarVisible);
+                }
+            }
+            
+            // 6-Month (Semi) Rolling VWAP
+            if (ShowSemiVwap && semiVwap.IsActive)
+            {
+                int fb = GetStubFirstBar(SemiStubMode, firstBarVisible, CurrentBar);
+                bool drawBands = ShowSemiBands && (!SemiStubMode || SemiStubBands);
+                
+                RenderVwapLine(renderTarget, chartControl, chartScale, semiVwap, SemiVwapColor, SemiVwapStyle, 2, fb, lastBarVisible, false);
+                
+                if (drawBands)
+                {
+                    for (int b = 1; b <= SemiBandMult; b++)
+                    {
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, semiVwap, b, true, SemiBandColor, SemiBandStyle, 1, fb, lastBarVisible);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, semiVwap, b, false, SemiBandColor, SemiBandStyle, 1, fb, lastBarVisible);
+                    }
+                    if (ShowBiasZoneFill && SemiBandMult >= 2)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, semiVwap, 1, 2, fb, lastBarVisible);
+                    else if (ShowBiasZoneFill && SemiBandMult >= 1)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, semiVwap, 1, 1, fb, lastBarVisible);
+                }
+            }
             
             // Year VWAP
             if (ShowYearVwap && yearVwap.IsActive)
-                RenderVwapLine(renderTarget, chartControl, chartScale, yearVwap, YearVwapColor, YearVwapStyle, 2, firstBarVisible, lastBarVisible, false);
+            {
+                int fb = GetStubFirstBar(YearStubMode, firstBarVisible, CurrentBar);
+                bool drawBands = ShowYearBands && (!YearStubMode || YearStubBands);
+                
+                RenderVwapLine(renderTarget, chartControl, chartScale, yearVwap, YearVwapColor, YearVwapStyle, 2, fb, lastBarVisible, false);
+                
+                if (drawBands)
+                {
+                    for (int b = 1; b <= YearBandMult; b++)
+                    {
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, yearVwap, b, true, YearBandColor, YearBandStyle, 1, fb, lastBarVisible);
+                        RenderVwapBandLine(renderTarget, chartControl, chartScale, yearVwap, b, false, YearBandColor, YearBandStyle, 1, fb, lastBarVisible);
+                    }
+                    if (ShowBiasZoneFill && YearBandMult >= 2)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, yearVwap, 1, 2, fb, lastBarVisible);
+                    else if (ShowBiasZoneFill && YearBandMult >= 1)
+                        RenderBandZoneFill(renderTarget, chartControl, chartScale, yearVwap, 1, 1, fb, lastBarVisible);
+                }
+            }
             
             // HOY VWAP
             if (ShowHoyVwap && hoyVwap.IsActive)
-                RenderVwapLine(renderTarget, chartControl, chartScale, hoyVwap, HoyVwapColor, HoyVwapStyle, 2, firstBarVisible, lastBarVisible, false);
+            {
+                int fb = GetStubFirstBar(HoyStubMode, firstBarVisible, CurrentBar);
+                RenderVwapLine(renderTarget, chartControl, chartScale, hoyVwap, HoyVwapColor, HoyVwapStyle, 2, fb, lastBarVisible, false);
+            }
             
             // ═══════════════════════════════════════════════
             // Render VWAP Labels
@@ -1491,8 +1810,14 @@ Write-Host 'COPIED_MP3'
                     RenderVwapLabel(renderTarget, chartControl, chartScale, hodVwap, HodVwapColor, "HOD", VwapLabelFontSize, lastBarVisible);
                 if (ShowLodVwap && lodVwap.IsActive)
                     RenderVwapLabel(renderTarget, chartControl, chartScale, lodVwap, LodVwapColor, "LOD", VwapLabelFontSize, lastBarVisible);
+                if (ShowWeekVwap && weekVwap.IsActive)
+                    RenderVwapLabel(renderTarget, chartControl, chartScale, weekVwap, WeekVwapColor, "Week", VwapLabelFontSize, lastBarVisible);
                 if (ShowMonthVwap && monthVwap.IsActive)
                     RenderVwapLabel(renderTarget, chartControl, chartScale, monthVwap, MonthVwapColor, "Month", VwapLabelFontSize, lastBarVisible);
+                if (ShowQuarterVwap && quarterVwap.IsActive)
+                    RenderVwapLabel(renderTarget, chartControl, chartScale, quarterVwap, QuarterVwapColor, "3M", VwapLabelFontSize, lastBarVisible);
+                if (ShowSemiVwap && semiVwap.IsActive)
+                    RenderVwapLabel(renderTarget, chartControl, chartScale, semiVwap, SemiVwapColor, "6M", VwapLabelFontSize, lastBarVisible);
                 if (ShowYearVwap && yearVwap.IsActive)
                     RenderVwapLabel(renderTarget, chartControl, chartScale, yearVwap, YearVwapColor, "Year", VwapLabelFontSize, lastBarVisible);
                 if (ShowHoyVwap && hoyVwap.IsActive)
@@ -1505,17 +1830,50 @@ Write-Host 'COPIED_MP3'
             if (ShowVwapFibBands)
             {
                 if (FibBandVwapTarget == "Session" && ShowDayVwap && dayVwap.IsActive)
-                    RenderVwapFibBands(renderTarget, chartControl, chartScale, dayVwap, firstBarVisible, lastBarVisible);
+                {
+                    int fb = GetStubFirstBar(DayStubMode && !DayStubBands, firstBarVisible, CurrentBar);
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, dayVwap, fb, lastBarVisible);
+                }
                 else if (FibBandVwapTarget == "NY Session" && ShowNyVwap && nyVwap.IsActive)
-                    RenderVwapFibBands(renderTarget, chartControl, chartScale, nyVwap, firstBarVisible, lastBarVisible);
+                {
+                    int fb = GetStubFirstBar(NyStubMode, firstBarVisible, CurrentBar);
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, nyVwap, fb, lastBarVisible);
+                }
                 else if (FibBandVwapTarget == "HOD" && ShowHodVwap && hodVwap.IsActive)
-                    RenderVwapFibBands(renderTarget, chartControl, chartScale, hodVwap, firstBarVisible, lastBarVisible);
+                {
+                    int fb = GetStubFirstBar(HodStubMode && !HodStubBands, firstBarVisible, CurrentBar);
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, hodVwap, fb, lastBarVisible);
+                }
                 else if (FibBandVwapTarget == "LOD" && ShowLodVwap && lodVwap.IsActive)
-                    RenderVwapFibBands(renderTarget, chartControl, chartScale, lodVwap, firstBarVisible, lastBarVisible);
+                {
+                    int fb = GetStubFirstBar(LodStubMode && !LodStubBands, firstBarVisible, CurrentBar);
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, lodVwap, fb, lastBarVisible);
+                }
+                else if (FibBandVwapTarget == "Week" && ShowWeekVwap && weekVwap.IsActive)
+                {
+                    int fb = GetStubFirstBar(WeekStubMode && !WeekStubBands, firstBarVisible, CurrentBar);
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, weekVwap, fb, lastBarVisible);
+                }
                 else if (FibBandVwapTarget == "Month" && ShowMonthVwap && monthVwap.IsActive)
-                    RenderVwapFibBands(renderTarget, chartControl, chartScale, monthVwap, firstBarVisible, lastBarVisible);
+                {
+                    int fb = GetStubFirstBar(MonthStubMode && !MonthStubBands, firstBarVisible, CurrentBar);
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, monthVwap, fb, lastBarVisible);
+                }
+                else if (FibBandVwapTarget == "3-Month" && ShowQuarterVwap && quarterVwap.IsActive)
+                {
+                    int fb = GetStubFirstBar(QuarterStubMode && !QuarterStubBands, firstBarVisible, CurrentBar);
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, quarterVwap, fb, lastBarVisible);
+                }
+                else if (FibBandVwapTarget == "6-Month" && ShowSemiVwap && semiVwap.IsActive)
+                {
+                    int fb = GetStubFirstBar(SemiStubMode && !SemiStubBands, firstBarVisible, CurrentBar);
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, semiVwap, fb, lastBarVisible);
+                }
                 else if (FibBandVwapTarget == "Year" && ShowYearVwap && yearVwap.IsActive)
-                    RenderVwapFibBands(renderTarget, chartControl, chartScale, yearVwap, firstBarVisible, lastBarVisible);
+                {
+                    int fb = GetStubFirstBar(YearStubMode && !YearStubBands, firstBarVisible, CurrentBar);
+                    RenderVwapFibBands(renderTarget, chartControl, chartScale, yearVwap, fb, lastBarVisible);
+                }
             }
             
             // ═══════════════════════════════════════════════
@@ -1568,6 +1926,64 @@ Write-Host 'COPIED_MP3'
             }
         }
         
+        // Compute firstBar for stub rendering: show only the last StubLengthBars of the VWAP.
+        // For live VWAPs, endBarRef is CurrentBar. For capped VWAPs (prev session), endBarRef is
+        // the maxBar. Falls back to full-chart firstBar if stubMode is false.
+        private int GetStubFirstBar(bool stubMode, int fullFirstBar, int endBarRef)
+        {
+            if (!stubMode) return fullFirstBar;
+            int stubFirst = endBarRef - Math.Max(1, StubLengthBars) + 1;
+            return Math.Max(fullFirstBar, stubFirst);
+        }
+        
+        // Find the earliest bar whose EST time is >= the given cutoff. Used for rolling-lookback
+        // VWAPs (3M, 6M) where the anchor slides forward each new session. Walks backward from
+        // CurrentBar since the anchor is always relatively close to the start of the lookback.
+        // Returns bar index, or the earliest available bar (clamped) if cutoff predates data.
+        private int FindAnchorBarByTime(DateTime cutoffEst)
+        {
+            // Walk back from CurrentBar until we find a bar with time < cutoff, then the anchor
+            // is the bar just after it. Cap the walk at the earliest loaded bar.
+            int minBar = Math.Max(0, CurrentBar - (Bars.Count - 1));
+            int anchor = minBar;
+            for (int i = CurrentBar; i >= minBar; i--)
+            {
+                int barsAgo = CurrentBar - i;
+                if (barsAgo < 0 || barsAgo >= Bars.Count) break;
+                
+                DateTime tEst = TimeZoneInfo.ConvertTime(
+                    DateTime.SpecifyKind(Time.GetValueAt(i), DateTimeKind.Unspecified), chartZone, estZone);
+                
+                if (tEst < cutoffEst)
+                {
+                    anchor = i + 1;
+                    break;
+                }
+                anchor = i; // provisional — will be overwritten if a later iter finds an earlier-enough bar
+            }
+            return Math.Max(minBar, Math.Min(anchor, CurrentBar));
+        }
+        
+        // Reset a rolling VWAP to the given anchor bar and walk forward bar-by-bar through
+        // CurrentBar, rebuilding the cumulative volume/typical-volume/variance so that Value,
+        // UpperBand, and LowerBand are correct for alerts and bands. The renderer re-walks from
+        // AnchorBar too (see RenderVwapLine), so the drawn line always reflects the rolling window.
+        private void RebuildRollingVwap(VwapData vwap, int anchorBar)
+        {
+            vwap.Reset(anchorBar);
+            for (int i = anchorBar; i <= CurrentBar; i++)
+            {
+                int barsAgo = CurrentBar - i;
+                if (barsAgo < 0 || barsAgo >= Bars.Count) continue;
+                
+                double v = Volume.GetValueAt(i);
+                if (v <= 0) continue;
+                
+                double src = (Open.GetValueAt(i) + High.GetValueAt(i) + Low.GetValueAt(i) + Close.GetValueAt(i)) / 4.0;
+                vwap.Update(src, v);
+            }
+        }
+        
         private void RenderVwapLine(RenderTarget renderTarget, ChartControl chartControl, ChartScale chartScale,
             VwapData vwap, System.Windows.Media.Brush brush, DashStyleHelper dashStyle, float width,
             int firstBar, int lastBar, bool nySessionOnly, int maxBar = -1)
@@ -1592,6 +2008,7 @@ Write-Host 'COPIED_MP3'
                 // Build list of points, then draw as a single PathGeometry for smoothness
                 var segments = new List<List<SharpDX.Vector2>>();
                 var currentSegment = new List<SharpDX.Vector2>();
+                int lastPointBar = -1;
                 
                 double cumVol = 0;
                 double cumTypVol = 0;
@@ -1642,6 +2059,22 @@ Write-Host 'COPIED_MP3'
                     float y = chartScale.GetYByValue(vwapVal);
                     
                     currentSegment.Add(new SharpDX.Vector2(x, y));
+                    lastPointBar = i;
+                }
+                
+                // Extend last point past the live edge (horizontal projection).
+                // Guard on maxBar < 0 to avoid extending historical capped renders (e.g., prev session).
+                // For NY session VWAPs, also require the last rendered bar to be at/near endBar
+                // (otherwise we may have broken out of session and ended mid-chart).
+                bool extendOk = maxBar < 0 && currentSegment.Count > 0;
+                if (nySessionOnly && extendOk)
+                    extendOk = lastPointBar >= endBar - 1;
+                
+                if (ExtendBarsRight > 0 && extendOk)
+                {
+                    var lastPt = currentSegment[currentSegment.Count - 1];
+                    float xExt = chartControl.GetXByBarIndex(ChartBars, endBar + ExtendBarsRight);
+                    currentSegment.Add(new SharpDX.Vector2(xExt, lastPt.Y));
                 }
                 
                 if (currentSegment.Count > 1)
@@ -1694,6 +2127,7 @@ Write-Host 'COPIED_MP3'
             using (var strokeStyle = GetStrokeStyle(renderTarget, dashStyle))
             {
                 var points = new List<SharpDX.Vector2>();
+                int lastPointBar = -1;
                 
                 double cumVol = 0;
                 double cumTypVol = 0;
@@ -1724,6 +2158,16 @@ Write-Host 'COPIED_MP3'
                     float y = chartScale.GetYByValue(bandVal);
                     
                     points.Add(new SharpDX.Vector2(x, y));
+                    lastPointBar = i;
+                }
+                
+                // Extend last point past the live edge (horizontal projection).
+                // Guard on maxBar < 0 to avoid extending historical capped renders (e.g., prev session).
+                if (ExtendBarsRight > 0 && maxBar < 0 && points.Count > 0)
+                {
+                    var lastPt = points[points.Count - 1];
+                    float xExt = chartControl.GetXByBarIndex(ChartBars, endBar + ExtendBarsRight);
+                    points.Add(new SharpDX.Vector2(xExt, lastPt.Y));
                 }
                 
                 if (points.Count >= 2)
@@ -1777,6 +2221,7 @@ Write-Host 'COPIED_MP3'
                 var currentAbove = new List<SharpDX.Vector2>();
                 var currentBelow = new List<SharpDX.Vector2>();
                 bool? wasAbove = null;
+                int lastPointBar = -1;
                 
                 double cumVol = 0;
                 double cumTypVol = 0;
@@ -1828,6 +2273,24 @@ Write-Host 'COPIED_MP3'
                         currentBelow.Add(point);
                     
                     wasAbove = isAbove;
+                    lastPointBar = i;
+                }
+                
+                // Extend last point past the live edge (horizontal projection).
+                // Dynamic coloring only applies to the active Session VWAP, which is always live.
+                if (ExtendBarsRight > 0 && wasAbove.HasValue)
+                {
+                    float xExt = chartControl.GetXByBarIndex(ChartBars, endBar + ExtendBarsRight);
+                    if (wasAbove.Value && currentAbove.Count > 0)
+                    {
+                        var lastPt = currentAbove[currentAbove.Count - 1];
+                        currentAbove.Add(new SharpDX.Vector2(xExt, lastPt.Y));
+                    }
+                    else if (!wasAbove.Value && currentBelow.Count > 0)
+                    {
+                        var lastPt = currentBelow[currentBelow.Count - 1];
+                        currentBelow.Add(new SharpDX.Vector2(xExt, lastPt.Y));
+                    }
                 }
                 
                 if (currentAbove.Count > 1) aboveSegments.Add(currentAbove);
@@ -2068,6 +2531,27 @@ Write-Host 'COPIED_MP3'
                 }
             }
             
+            // Extend last point past the live edge (horizontal projection) on all band arrays.
+            // Gate on maxBar < 0 to skip historical capped renders.
+            bool extendedRightEdge = false;
+            if (ExtendBarsRight > 0 && maxBar < 0 && ptsVwap.Count > 0)
+            {
+                float xExt = chartControl.GetXByBarIndex(ChartBars, endBar + ExtendBarsRight);
+                ptsVwap.Add(new SharpDX.Vector2(xExt, ptsVwap[ptsVwap.Count - 1].Y));
+                ptsU1.Add(new SharpDX.Vector2(xExt, ptsU1[ptsU1.Count - 1].Y));
+                ptsL1.Add(new SharpDX.Vector2(xExt, ptsL1[ptsL1.Count - 1].Y));
+                ptsU2.Add(new SharpDX.Vector2(xExt, ptsU2[ptsU2.Count - 1].Y));
+                ptsL2.Add(new SharpDX.Vector2(xExt, ptsL2[ptsL2.Count - 1].Y));
+                for (int f = 0; f < fibBandLevels.Length; f++)
+                {
+                    if (ptsFibUp[f].Count > 0)
+                        ptsFibUp[f].Add(new SharpDX.Vector2(xExt, ptsFibUp[f][ptsFibUp[f].Count - 1].Y));
+                    if (ptsFibDn[f].Count > 0)
+                        ptsFibDn[f].Add(new SharpDX.Vector2(xExt, ptsFibDn[f][ptsFibDn[f].Count - 1].Y));
+                }
+                extendedRightEdge = true;
+            }
+            
             if (ptsVwap.Count < 2) { renderTarget.AntialiasMode = oldAA; return; }
             
             // ── Build SharpDX brushes ──
@@ -2106,10 +2590,24 @@ Write-Host 'COPIED_MP3'
                     using (var fillLong  = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, new SharpDX.Color4(cLong.Red,  cLong.Green,  cLong.Blue,  biasAlpha)))
                     using (var fillShort = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, new SharpDX.Color4(cShort.Red, cShort.Green, cShort.Blue, biasAlpha)))
                     {
-                        // Long bias: above +Band1 up to +Band2
-                        DrawFibFill(renderTarget, ptsU2, ptsU1, fillLong);
-                        // Short bias: below -Band1 down to -Band2
-                        DrawFibFill(renderTarget, ptsL1, ptsL2, fillShort);
+                        // Estimate bar width from point spacing
+                        float bw = ptsU1.Count > 1 ? Math.Max(1f, Math.Abs(ptsU1[1].X - ptsU1[0].X) + 1f) : 6f;
+                        // Skip the extended synthetic point (if any) - it would draw one fat stripe at xExt
+                        int biasEnd = extendedRightEdge ? ptsU1.Count - 1 : ptsU1.Count;
+                        var oldAABias = renderTarget.AntialiasMode;
+                        renderTarget.AntialiasMode = SharpDX.Direct2D1.AntialiasMode.Aliased;
+                        for (int pi = 0; pi < biasEnd; pi++)
+                        {
+                            // Long: +Band1 up to +Band2 (Y is inverted on screen)
+                            renderTarget.DrawLine(new SharpDX.Vector2(ptsU1[pi].X, ptsU2[pi].Y),
+                                                  new SharpDX.Vector2(ptsU1[pi].X, ptsU1[pi].Y),
+                                                  fillLong, bw);
+                            // Short: -Band1 down to -Band2
+                            renderTarget.DrawLine(new SharpDX.Vector2(ptsL1[pi].X, ptsL1[pi].Y),
+                                                  new SharpDX.Vector2(ptsL1[pi].X, ptsL2[pi].Y),
+                                                  fillShort, bw);
+                        }
+                        renderTarget.AntialiasMode = oldAABias;
                     }
                 }
                 
@@ -2119,8 +2617,17 @@ Write-Host 'COPIED_MP3'
                 DrawFibLine(renderTarget, ptsU2, brushU2, 1f,   ss2);
                 DrawFibLine(renderTarget, ptsL2, brushU2, 1f,   ss2);
                 
+                // Compute the sub-band fraction that coincides with ±Band1 so we can skip it.
+                // Sub-band at fraction f sits at vwap ± f * Band2Mult * σ;
+                // ±Band1 sits at vwap ± Band1Mult * σ → collision when f == Band1Mult / Band2Mult.
+                double band1Fraction = (FibBand2Mult != 0)
+                    ? FibBand1Mult / FibBand2Mult
+                    : double.NaN;
+                const double fibEps = 1e-6;
+                
                 for (int f = 0; f < fibBandLevels.Length; f++)
                 {
+                    if (Math.Abs(fibBandLevels[f] - band1Fraction) < fibEps) continue; // don't overpaint Band1
                     DrawFibLine(renderTarget, ptsFibUp[f], brushFib, 1f, ssF);
                     DrawFibLine(renderTarget, ptsFibDn[f], brushFib, 1f, ssF);
                 }
@@ -2141,6 +2648,7 @@ Write-Host 'COPIED_MP3'
                     
                     for (int f = 0; f < fibBandLevels.Length; f++)
                     {
+                        if (Math.Abs(fibBandLevels[f] - band1Fraction) < fibEps) continue; // skip label that overlaps ±Band1
                         if (ptsFibUp[f].Count > 0)
                             DrawFibLabel(renderTarget, rightX, ptsFibUp[f][ptsFibUp[f].Count - 1].Y,
                                 fibBandLevels[f].ToString("0.000"), brushFib, labelTextFmt);
@@ -2155,8 +2663,9 @@ Write-Host 'COPIED_MP3'
         }
         
         // ── Render bias zone fill between two std-dev multiplier bands ──────────────────
-        // longMultInner/Outer: the band multipliers to fill between (e.g. 1 and 2).
-        // Fills +inner→+outer with BiasLongColor and -inner→-outer with BiasShortColor.
+        // Uses per-bar vertical DrawLine strokes instead of FillGeometry so NT8's
+        // ChartPanel hit-tester (which operates on closed/filled geometry bounds) does
+        // not register this indicator as owning the filled region, preserving chart panning.
         private void RenderBandZoneFill(RenderTarget renderTarget, ChartControl chartControl, ChartScale chartScale,
             VwapData vwap, double innerMult, double outerMult, int firstBar, int lastBar, int maxBar = -1)
         {
@@ -2166,54 +2675,61 @@ Write-Host 'COPIED_MP3'
             if (maxBar >= 0) endBar = Math.Min(endBar, maxBar);
             if (vwap.AnchorBar >= endBar) return;
             
-            var ptsUpperInner = new List<SharpDX.Vector2>();
-            var ptsUpperOuter = new List<SharpDX.Vector2>();
-            var ptsLowerInner = new List<SharpDX.Vector2>();
-            var ptsLowerOuter = new List<SharpDX.Vector2>();
-            
-            double cumVol = 0, cumTypVol = 0, cumVolSq = 0;
-            
-            for (int i = vwap.AnchorBar; i <= endBar; i++)
-            {
-                int barsAgo = CurrentBar - i;
-                if (barsAgo < 0 || barsAgo >= Bars.Count) continue;
-                
-                double vol = Volume.GetValueAt(i);
-                double src = (Open.GetValueAt(i) + High.GetValueAt(i) + Low.GetValueAt(i) + Close.GetValueAt(i)) / 4.0;
-                cumVol    += vol;
-                cumTypVol += src * vol;
-                cumVolSq  += src * src * vol;
-                if (cumVol <= 0) continue;
-                
-                double vwapVal  = cumTypVol / cumVol;
-                double variance = (cumVolSq / cumVol) - (vwapVal * vwapVal);
-                double stdDev   = variance > 0 ? Math.Sqrt(variance) : 0;
-                
-                if (i < firstBar) continue;
-                
-                float x = chartControl.GetXByBarIndex(ChartBars, i);
-                ptsUpperInner.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(vwapVal + innerMult * stdDev)));
-                ptsUpperOuter.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(vwapVal + outerMult * stdDev)));
-                ptsLowerInner.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(vwapVal - innerMult * stdDev)));
-                ptsLowerOuter.Add(new SharpDX.Vector2(x, chartScale.GetYByValue(vwapVal - outerMult * stdDev)));
-            }
-            
-            if (ptsUpperInner.Count < 2) return;
-            
             float biasAlpha = Math.Max(0, Math.Min(100, BiasZoneFillOpacity)) / 100f;
             SharpDX.Color4 cLong  = BrushToColor4(BiasLongColor);
             SharpDX.Color4 cShort = BrushToColor4(BiasShortColor);
             
-            var oldAA = renderTarget.AntialiasMode;
-            renderTarget.AntialiasMode = SharpDX.Direct2D1.AntialiasMode.PerPrimitive;
-            
-            using (var fillLong  = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, new SharpDX.Color4(cLong.Red,  cLong.Green,  cLong.Blue,  biasAlpha)))
-            using (var fillShort = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, new SharpDX.Color4(cShort.Red, cShort.Green, cShort.Blue, biasAlpha)))
+            // Estimate bar width for stroke thickness — use spacing between two visible bars
+            float barWidth = 6f;
+            if (lastBar > firstBar)
             {
-                // Long zone: +innerMult σ → +outerMult σ
-                DrawFibFill(renderTarget, ptsUpperOuter, ptsUpperInner, fillLong);
-                // Short zone: -innerMult σ → -outerMult σ
-                DrawFibFill(renderTarget, ptsLowerInner, ptsLowerOuter, fillShort);
+                float x0 = chartControl.GetXByBarIndex(ChartBars, firstBar);
+                float x1 = chartControl.GetXByBarIndex(ChartBars, Math.Min(firstBar + 1, lastBar));
+                barWidth = Math.Max(1f, Math.Abs(x1 - x0) + 1f);
+            }
+            
+            var oldAA = renderTarget.AntialiasMode;
+            renderTarget.AntialiasMode = SharpDX.Direct2D1.AntialiasMode.Aliased;
+            
+            using (var brushLong  = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, new SharpDX.Color4(cLong.Red,  cLong.Green,  cLong.Blue,  biasAlpha)))
+            using (var brushShort = new SharpDX.Direct2D1.SolidColorBrush(renderTarget, new SharpDX.Color4(cShort.Red, cShort.Green, cShort.Blue, biasAlpha)))
+            {
+                double cumVol = 0, cumTypVol = 0, cumVolSq = 0;
+                
+                for (int i = vwap.AnchorBar; i <= endBar; i++)
+                {
+                    int barsAgo = CurrentBar - i;
+                    if (barsAgo < 0 || barsAgo >= Bars.Count) continue;
+                    
+                    double vol = Volume.GetValueAt(i);
+                    double src = (Open.GetValueAt(i) + High.GetValueAt(i) + Low.GetValueAt(i) + Close.GetValueAt(i)) / 4.0;
+                    cumVol    += vol;
+                    cumTypVol += src * vol;
+                    cumVolSq  += src * src * vol;
+                    if (cumVol <= 0 || i < firstBar) continue;
+                    
+                    double vwapVal  = cumTypVol / cumVol;
+                    double variance = (cumVolSq / cumVol) - (vwapVal * vwapVal);
+                    double stdDev   = variance > 0 ? Math.Sqrt(variance) : 0;
+                    
+                    float x          = chartControl.GetXByBarIndex(ChartBars, i);
+                    float yUpperInner = chartScale.GetYByValue(vwapVal + innerMult * stdDev);
+                    float yUpperOuter = chartScale.GetYByValue(vwapVal + outerMult * stdDev);
+                    float yLowerInner = chartScale.GetYByValue(vwapVal - innerMult * stdDev);
+                    float yLowerOuter = chartScale.GetYByValue(vwapVal - outerMult * stdDev);
+                    
+                    // Long zone: draw vertical stroke from +outer down to +inner (remember Y flips)
+                    renderTarget.DrawLine(
+                        new SharpDX.Vector2(x, yUpperOuter),
+                        new SharpDX.Vector2(x, yUpperInner),
+                        brushLong, barWidth);
+                    
+                    // Short zone: draw vertical stroke from -inner down to -outer
+                    renderTarget.DrawLine(
+                        new SharpDX.Vector2(x, yLowerInner),
+                        new SharpDX.Vector2(x, yLowerOuter),
+                        brushShort, barWidth);
+                }
             }
             
             renderTarget.AntialiasMode = oldAA;
@@ -2507,12 +3023,57 @@ Write-Host 'COPIED_MP3'
         // Higher Timeframe VWAPs
         // ═══════════════════════════════════════════════
         
+        // Week VWAP
         [NinjaScriptProperty]
-        [Display(Name = "Show Month VWAP", Order = 1, GroupName = "4. Monthly & Yearly VWAPs")]
+        [Display(Name = "Show Week VWAP", Order = 1, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public bool ShowWeekVwap { get; set; }
+        
+        [XmlIgnore]
+        [Display(Name = "Week VWAP Color", Order = 2, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public System.Windows.Media.Brush WeekVwapColor { get; set; }
+        
+        [Browsable(false)]
+        public string WeekVwapColorSerialize
+        {
+            get { return Serialize.BrushToString(WeekVwapColor); }
+            set { WeekVwapColor = Serialize.StringToBrush(value); }
+        }
+        
+        [Display(Name = "Week VWAP Line Style", Order = 3, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public DashStyleHelper WeekVwapStyle { get; set; }
+        
+        [Range(0, int.MaxValue)]
+        [Display(Name = "Historical Week VWAPs", Order = 4, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public int WeekVwapHistoryCount { get; set; }
+        
+        [Display(Name = "Show Week Bands", Order = 5, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public bool ShowWeekBands { get; set; }
+        
+        [Range(1, 5)]
+        [Display(Name = "Number of Week Bands", Order = 6, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public int WeekBandMult { get; set; }
+        
+        [XmlIgnore]
+        [Display(Name = "Week Band Color", Order = 7, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public System.Windows.Media.Brush WeekBandColor { get; set; }
+        
+        [Browsable(false)]
+        public string WeekBandColorSerialize
+        {
+            get { return Serialize.BrushToString(WeekBandColor); }
+            set { WeekBandColor = Serialize.StringToBrush(value); }
+        }
+        
+        [Display(Name = "Week Band Line Style", Order = 8, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public DashStyleHelper WeekBandStyle { get; set; }
+        
+        // Month VWAP
+        [NinjaScriptProperty]
+        [Display(Name = "Show Month VWAP", Order = 9, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
         public bool ShowMonthVwap { get; set; }
         
         [XmlIgnore]
-        [Display(Name = "Month VWAP Color", Order = 2, GroupName = "4. Monthly & Yearly VWAPs")]
+        [Display(Name = "Month VWAP Color", Order = 10, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
         public System.Windows.Media.Brush MonthVwapColor { get; set; }
         
         [Browsable(false)]
@@ -2522,19 +3083,119 @@ Write-Host 'COPIED_MP3'
             set { MonthVwapColor = Serialize.StringToBrush(value); }
         }
         
-        [Display(Name = "Month VWAP Line Style", Order = 3, GroupName = "4. Monthly & Yearly VWAPs")]
+        [Display(Name = "Month VWAP Line Style", Order = 11, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
         public DashStyleHelper MonthVwapStyle { get; set; }
         
         [Range(0, int.MaxValue)]
-        [Display(Name = "Historical Month VWAPs", Order = 4, GroupName = "4. Monthly & Yearly VWAPs")]
+        [Display(Name = "Historical Month VWAPs", Order = 12, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
         public int MonthVwapHistoryCount { get; set; }
         
+        [Display(Name = "Show Month Bands", Order = 13, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public bool ShowMonthBands { get; set; }
+        
+        [Range(1, 5)]
+        [Display(Name = "Number of Month Bands", Order = 14, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public int MonthBandMult { get; set; }
+        
+        [XmlIgnore]
+        [Display(Name = "Month Band Color", Order = 15, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public System.Windows.Media.Brush MonthBandColor { get; set; }
+        
+        [Browsable(false)]
+        public string MonthBandColorSerialize
+        {
+            get { return Serialize.BrushToString(MonthBandColor); }
+            set { MonthBandColor = Serialize.StringToBrush(value); }
+        }
+        
+        [Display(Name = "Month Band Line Style", Order = 16, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public DashStyleHelper MonthBandStyle { get; set; }
+        
+        // 3-Month (Quarter) Rolling VWAP
+        [Display(Name = "Show 3-Month VWAP", Description = "Rolling 3-month anchored VWAP (anchor slides forward each new session)", Order = 17, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public bool ShowQuarterVwap { get; set; }
+        
+        [XmlIgnore]
+        [Display(Name = "3-Month VWAP Color", Order = 18, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public System.Windows.Media.Brush QuarterVwapColor { get; set; }
+        
+        [Browsable(false)]
+        public string QuarterVwapColorSerialize
+        {
+            get { return Serialize.BrushToString(QuarterVwapColor); }
+            set { QuarterVwapColor = Serialize.StringToBrush(value); }
+        }
+        
+        [Display(Name = "3-Month VWAP Line Style", Order = 19, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public DashStyleHelper QuarterVwapStyle { get; set; }
+        
+        [Display(Name = "Show 3-Month Bands", Order = 20, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public bool ShowQuarterBands { get; set; }
+        
+        [Range(1, 5)]
+        [Display(Name = "Number of 3-Month Bands", Order = 21, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public int QuarterBandMult { get; set; }
+        
+        [XmlIgnore]
+        [Display(Name = "3-Month Band Color", Order = 22, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public System.Windows.Media.Brush QuarterBandColor { get; set; }
+        
+        [Browsable(false)]
+        public string QuarterBandColorSerialize
+        {
+            get { return Serialize.BrushToString(QuarterBandColor); }
+            set { QuarterBandColor = Serialize.StringToBrush(value); }
+        }
+        
+        [Display(Name = "3-Month Band Line Style", Order = 23, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public DashStyleHelper QuarterBandStyle { get; set; }
+        
+        // 6-Month (Semi) Rolling VWAP
+        [Display(Name = "Show 6-Month VWAP", Description = "Rolling 6-month anchored VWAP (anchor slides forward each new session)", Order = 24, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public bool ShowSemiVwap { get; set; }
+        
+        [XmlIgnore]
+        [Display(Name = "6-Month VWAP Color", Order = 25, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public System.Windows.Media.Brush SemiVwapColor { get; set; }
+        
+        [Browsable(false)]
+        public string SemiVwapColorSerialize
+        {
+            get { return Serialize.BrushToString(SemiVwapColor); }
+            set { SemiVwapColor = Serialize.StringToBrush(value); }
+        }
+        
+        [Display(Name = "6-Month VWAP Line Style", Order = 26, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public DashStyleHelper SemiVwapStyle { get; set; }
+        
+        [Display(Name = "Show 6-Month Bands", Order = 27, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public bool ShowSemiBands { get; set; }
+        
+        [Range(1, 5)]
+        [Display(Name = "Number of 6-Month Bands", Order = 28, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public int SemiBandMult { get; set; }
+        
+        [XmlIgnore]
+        [Display(Name = "6-Month Band Color", Order = 29, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public System.Windows.Media.Brush SemiBandColor { get; set; }
+        
+        [Browsable(false)]
+        public string SemiBandColorSerialize
+        {
+            get { return Serialize.BrushToString(SemiBandColor); }
+            set { SemiBandColor = Serialize.StringToBrush(value); }
+        }
+        
+        [Display(Name = "6-Month Band Line Style", Order = 30, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public DashStyleHelper SemiBandStyle { get; set; }
+        
+        // Year VWAP
         [NinjaScriptProperty]
-        [Display(Name = "Show Year VWAP", Order = 5, GroupName = "4. Monthly & Yearly VWAPs")]
+        [Display(Name = "Show Year VWAP", Order = 31, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
         public bool ShowYearVwap { get; set; }
         
         [XmlIgnore]
-        [Display(Name = "Year VWAP Color", Order = 6, GroupName = "4. Monthly & Yearly VWAPs")]
+        [Display(Name = "Year VWAP Color", Order = 32, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
         public System.Windows.Media.Brush YearVwapColor { get; set; }
         
         [Browsable(false)]
@@ -2544,19 +3205,41 @@ Write-Host 'COPIED_MP3'
             set { YearVwapColor = Serialize.StringToBrush(value); }
         }
         
-        [Display(Name = "Year VWAP Line Style", Order = 7, GroupName = "4. Monthly & Yearly VWAPs")]
+        [Display(Name = "Year VWAP Line Style", Order = 33, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
         public DashStyleHelper YearVwapStyle { get; set; }
         
         [Range(0, int.MaxValue)]
-        [Display(Name = "Historical Year VWAPs", Order = 8, GroupName = "4. Monthly & Yearly VWAPs")]
+        [Display(Name = "Historical Year VWAPs", Order = 34, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
         public int YearVwapHistoryCount { get; set; }
         
+        [Display(Name = "Show Year Bands", Order = 35, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public bool ShowYearBands { get; set; }
+        
+        [Range(1, 5)]
+        [Display(Name = "Number of Year Bands", Order = 36, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public int YearBandMult { get; set; }
+        
+        [XmlIgnore]
+        [Display(Name = "Year Band Color", Order = 37, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public System.Windows.Media.Brush YearBandColor { get; set; }
+        
+        [Browsable(false)]
+        public string YearBandColorSerialize
+        {
+            get { return Serialize.BrushToString(YearBandColor); }
+            set { YearBandColor = Serialize.StringToBrush(value); }
+        }
+        
+        [Display(Name = "Year Band Line Style", Order = 38, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
+        public DashStyleHelper YearBandStyle { get; set; }
+        
+        // HOY VWAP
         [NinjaScriptProperty]
-        [Display(Name = "Show HOY VWAP", Order = 9, GroupName = "4. Monthly & Yearly VWAPs")]
+        [Display(Name = "Show HOY VWAP", Order = 39, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
         public bool ShowHoyVwap { get; set; }
         
         [XmlIgnore]
-        [Display(Name = "HOY VWAP Color", Order = 10, GroupName = "4. Monthly & Yearly VWAPs")]
+        [Display(Name = "HOY VWAP Color", Order = 40, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
         public System.Windows.Media.Brush HoyVwapColor { get; set; }
         
         [Browsable(false)]
@@ -2566,7 +3249,7 @@ Write-Host 'COPIED_MP3'
             set { HoyVwapColor = Serialize.StringToBrush(value); }
         }
         
-        [Display(Name = "HOY VWAP Line Style", Order = 11, GroupName = "4. Monthly & Yearly VWAPs")]
+        [Display(Name = "HOY VWAP Line Style", Order = 41, GroupName = "4. Weekly, Monthly & Yearly VWAPs")]
         public DashStyleHelper HoyVwapStyle { get; set; }
         
         // ═══════════════════════════════════════════════
@@ -2574,19 +3257,19 @@ Write-Host 'COPIED_MP3'
         // ═══════════════════════════════════════════════
         
         [NinjaScriptProperty]
-        [Display(Name = "Show NY Opening Range", Order = 1, GroupName = "5. NY Opening Range")]
+        [Display(Name = "Show NY Opening Range", Order = 1, GroupName = "6. NY Opening Range")]
         public bool ShowNyOpeningRange { get; set; }
         
-        [Display(Name = "Opening Range Start (EST)", Order = 2, GroupName = "5. NY Opening Range")]
+        [Display(Name = "Opening Range Start (EST)", Order = 2, GroupName = "6. NY Opening Range")]
         [PropertyEditor("NinjaTrader.Gui.Tools.TimeEditorKey")]
         public DateTime NyOpeningRangeStart { get; set; }
         
-        [Display(Name = "Opening Range End (EST)", Order = 3, GroupName = "5. NY Opening Range")]
+        [Display(Name = "Opening Range End (EST)", Order = 3, GroupName = "6. NY Opening Range")]
         [PropertyEditor("NinjaTrader.Gui.Tools.TimeEditorKey")]
         public DateTime NyOpeningRangeEnd { get; set; }
         
         [XmlIgnore]
-        [Display(Name = "Range Line Color", Order = 4, GroupName = "5. NY Opening Range")]
+        [Display(Name = "Range Line Color", Order = 4, GroupName = "6. NY Opening Range")]
         public System.Windows.Media.Brush NyRangeColor { get; set; }
         
         [Browsable(false)]
@@ -2596,33 +3279,33 @@ Write-Host 'COPIED_MP3'
             set { NyRangeColor = Serialize.StringToBrush(value); }
         }
         
-        [Display(Name = "High Line Style", Order = 5, GroupName = "5. NY Opening Range")]
+        [Display(Name = "High Line Style", Order = 5, GroupName = "6. NY Opening Range")]
         public DashStyleHelper NyRangeHighStyle { get; set; }
         
-        [Display(Name = "Low Line Style", Order = 6, GroupName = "5. NY Opening Range")]
+        [Display(Name = "Low Line Style", Order = 6, GroupName = "6. NY Opening Range")]
         public DashStyleHelper NyRangeLowStyle { get; set; }
         
         [Range(1, 10)]
-        [Display(Name = "Range Line Thickness", Order = 7, GroupName = "5. NY Opening Range")]
+        [Display(Name = "Range Line Thickness", Order = 7, GroupName = "6. NY Opening Range")]
         public int NyRangeLineThickness { get; set; }
         
         [Range(0, 100)]
-        [Display(Name = "Line Opacity (0=transparent, 100=solid)", Order = 8, GroupName = "5. NY Opening Range")]
+        [Display(Name = "Line Opacity (0=transparent, 100=solid)", Order = 8, GroupName = "6. NY Opening Range")]
         public int NyRangeLineOpacity { get; set; }
         
         [Range(0, 100)]
-        [Display(Name = "Fill Opacity (0=solid, 100=transparent)", Order = 9, GroupName = "5. NY Opening Range")]
+        [Display(Name = "Fill Opacity (0=solid, 100=transparent)", Order = 9, GroupName = "6. NY Opening Range")]
         public int NyRangeFillOpacity { get; set; }
         
         [Range(0, int.MaxValue)]
-        [Display(Name = "Historical Opening Ranges", Order = 10, GroupName = "5. NY Opening Range")]
+        [Display(Name = "Historical Opening Ranges", Order = 10, GroupName = "6. NY Opening Range")]
         public int NyRangeHistoryCount { get; set; }
         
-        [Display(Name = "Show Text Label", Order = 11, GroupName = "5. NY Opening Range")]
+        [Display(Name = "Show Text Label", Order = 11, GroupName = "6. NY Opening Range")]
         public bool ShowNyRangeText { get; set; }
         
         [Range(6, 30)]
-        [Display(Name = "Font Size", Order = 12, GroupName = "5. NY Opening Range")]
+        [Display(Name = "Font Size", Order = 12, GroupName = "6. NY Opening Range")]
         public int NyRangeFontSize { get; set; }
         
         // ═══════════════════════════════════════════════
@@ -2630,19 +3313,19 @@ Write-Host 'COPIED_MP3'
         // ═══════════════════════════════════════════════
         
         [NinjaScriptProperty]
-        [Display(Name = "Show Day Initial Balance", Order = 1, GroupName = "6. Day Initial Balance")]
+        [Display(Name = "Show Day Initial Balance", Order = 1, GroupName = "7. Day Initial Balance")]
         public bool ShowDayInitialBalance { get; set; }
         
-        [Display(Name = "IB Range Start (EST)", Order = 2, GroupName = "6. Day Initial Balance")]
+        [Display(Name = "IB Range Start (EST)", Order = 2, GroupName = "7. Day Initial Balance")]
         [PropertyEditor("NinjaTrader.Gui.Tools.TimeEditorKey")]
         public DateTime DayIBStart { get; set; }
         
-        [Display(Name = "IB Range End (EST)", Order = 3, GroupName = "6. Day Initial Balance")]
+        [Display(Name = "IB Range End (EST)", Order = 3, GroupName = "7. Day Initial Balance")]
         [PropertyEditor("NinjaTrader.Gui.Tools.TimeEditorKey")]
         public DateTime DayIBEnd { get; set; }
         
         [XmlIgnore]
-        [Display(Name = "IB Line Color", Order = 4, GroupName = "6. Day Initial Balance")]
+        [Display(Name = "IB Line Color", Order = 4, GroupName = "7. Day Initial Balance")]
         public System.Windows.Media.Brush DayIBColor { get; set; }
         
         [Browsable(false)]
@@ -2652,75 +3335,154 @@ Write-Host 'COPIED_MP3'
             set { DayIBColor = Serialize.StringToBrush(value); }
         }
         
-        [Display(Name = "IB High Line Style", Order = 5, GroupName = "6. Day Initial Balance")]
+        [Display(Name = "IB High Line Style", Order = 5, GroupName = "7. Day Initial Balance")]
         public DashStyleHelper DayIBHighStyle { get; set; }
         
-        [Display(Name = "IB Low Line Style", Order = 6, GroupName = "6. Day Initial Balance")]
+        [Display(Name = "IB Low Line Style", Order = 6, GroupName = "7. Day Initial Balance")]
         public DashStyleHelper DayIBLowStyle { get; set; }
         
         [Range(1, 10)]
-        [Display(Name = "IB Line Thickness", Order = 7, GroupName = "6. Day Initial Balance")]
+        [Display(Name = "IB Line Thickness", Order = 7, GroupName = "7. Day Initial Balance")]
         public int DayIBLineThickness { get; set; }
         
         [Range(0, 100)]
-        [Display(Name = "Line Opacity (0=transparent, 100=solid)", Order = 8, GroupName = "6. Day Initial Balance")]
+        [Display(Name = "Line Opacity (0=transparent, 100=solid)", Order = 8, GroupName = "7. Day Initial Balance")]
         public int DayIBLineOpacity { get; set; }
         
         [Range(0, 100)]
-        [Display(Name = "Fill Opacity (0=solid, 100=transparent)", Order = 9, GroupName = "6. Day Initial Balance")]
+        [Display(Name = "Fill Opacity (0=solid, 100=transparent)", Order = 9, GroupName = "7. Day Initial Balance")]
         public int DayIBFillOpacity { get; set; }
         
         [Range(0, int.MaxValue)]
-        [Display(Name = "Historical Balance Ranges", Order = 10, GroupName = "6. Day Initial Balance")]
+        [Display(Name = "Historical Balance Ranges", Order = 10, GroupName = "7. Day Initial Balance")]
         public int DayIBHistoryCount { get; set; }
         
-        [Display(Name = "Show Text Label", Order = 11, GroupName = "6. Day Initial Balance")]
+        [Display(Name = "Show Text Label", Order = 11, GroupName = "7. Day Initial Balance")]
         public bool ShowIBText { get; set; }
         
         [Range(6, 30)]
-        [Display(Name = "Font Size", Order = 12, GroupName = "6. Day Initial Balance")]
+        [Display(Name = "Font Size", Order = 12, GroupName = "7. Day Initial Balance")]
         public int DayIBFontSize { get; set; }
         
         // ═══════════════════════════════════════════════
         // General Display Settings
         // ═══════════════════════════════════════════════
         
-        [Display(Name = "Merge Overlapping OR/IB Levels", Order = 1, GroupName = "7. General Display")]
+        [Display(Name = "Merge Overlapping OR/IB Levels", Order = 1, GroupName = "8. General Display")]
         public bool MergeOverlappingLevels { get; set; }
         
-        [Display(Name = "Show VWAP Labels", Order = 2, GroupName = "7. General Display")]
+        [Display(Name = "Show VWAP Labels", Order = 2, GroupName = "8. General Display")]
         public bool ShowVwapLabels { get; set; }
         
         [Range(6, 30)]
-        [Display(Name = "VWAP Label Font Size", Order = 3, GroupName = "7. General Display")]
+        [Display(Name = "VWAP Label Font Size", Order = 3, GroupName = "8. General Display")]
         public int VwapLabelFontSize { get; set; }
+        
+        [Range(0, 20)]
+        [Display(Name = "Extend Lines Right (Bars)", Description = "Number of bars to extend VWAP lines past the current bar", Order = 4, GroupName = "8. General Display")]
+        public int ExtendBarsRight { get; set; }
+        
+        // ═══════════════════════════════════════════════
+        // Right-Edge Stub Mode
+        // Render selected VWAPs only as a short segment on the right side
+        // of the chart instead of spanning from anchor to current bar.
+        // Useful for showing long-term reference levels (weekly, monthly)
+        // without cluttering an entry chart.
+        // ═══════════════════════════════════════════════
+        
+        [Range(5, 200)]
+        [Display(Name = "Stub Length (Bars)", Description = "How many bars wide the right-edge stub is. Applies to any VWAP with Stub Mode enabled.", Order = 1, GroupName = "5. Right-Edge Stub Mode")]
+        public int StubLengthBars { get; set; }
+        
+        [Display(Name = "NY VWAP: Stub Mode", Description = "Render NY Session VWAP only as a short segment on the right side of the chart.", Order = 10, GroupName = "5. Right-Edge Stub Mode")]
+        public bool NyStubMode { get; set; }
+        
+        [Display(Name = "Prev NY VWAP: Stub Mode", Order = 12, GroupName = "5. Right-Edge Stub Mode")]
+        public bool PrevNyStubMode { get; set; }
+        
+        [Display(Name = "Session VWAP: Stub Mode", Order = 20, GroupName = "5. Right-Edge Stub Mode")]
+        public bool DayStubMode { get; set; }
+        
+        [Display(Name = "Session VWAP: Stub Bands", Order = 21, GroupName = "5. Right-Edge Stub Mode")]
+        public bool DayStubBands { get; set; }
+        
+        [Display(Name = "Prev Session VWAP: Stub Mode", Order = 22, GroupName = "5. Right-Edge Stub Mode")]
+        public bool PrevSessionStubMode { get; set; }
+        
+        [Display(Name = "Prev Session VWAP: Stub Bands", Order = 23, GroupName = "5. Right-Edge Stub Mode")]
+        public bool PrevSessionStubBands { get; set; }
+        
+        [Display(Name = "HOD VWAP: Stub Mode", Order = 30, GroupName = "5. Right-Edge Stub Mode")]
+        public bool HodStubMode { get; set; }
+        
+        [Display(Name = "HOD VWAP: Stub Bands", Order = 31, GroupName = "5. Right-Edge Stub Mode")]
+        public bool HodStubBands { get; set; }
+        
+        [Display(Name = "LOD VWAP: Stub Mode", Order = 32, GroupName = "5. Right-Edge Stub Mode")]
+        public bool LodStubMode { get; set; }
+        
+        [Display(Name = "LOD VWAP: Stub Bands", Order = 33, GroupName = "5. Right-Edge Stub Mode")]
+        public bool LodStubBands { get; set; }
+        
+        [Display(Name = "Week VWAP: Stub Mode", Order = 40, GroupName = "5. Right-Edge Stub Mode")]
+        public bool WeekStubMode { get; set; }
+        
+        [Display(Name = "Week VWAP: Stub Bands", Order = 41, GroupName = "5. Right-Edge Stub Mode")]
+        public bool WeekStubBands { get; set; }
+        
+        [Display(Name = "Month VWAP: Stub Mode", Order = 42, GroupName = "5. Right-Edge Stub Mode")]
+        public bool MonthStubMode { get; set; }
+        
+        [Display(Name = "Month VWAP: Stub Bands", Order = 43, GroupName = "5. Right-Edge Stub Mode")]
+        public bool MonthStubBands { get; set; }
+        
+        [Display(Name = "3-Month VWAP: Stub Mode", Order = 44, GroupName = "5. Right-Edge Stub Mode")]
+        public bool QuarterStubMode { get; set; }
+        
+        [Display(Name = "3-Month VWAP: Stub Bands", Order = 45, GroupName = "5. Right-Edge Stub Mode")]
+        public bool QuarterStubBands { get; set; }
+        
+        [Display(Name = "6-Month VWAP: Stub Mode", Order = 46, GroupName = "5. Right-Edge Stub Mode")]
+        public bool SemiStubMode { get; set; }
+        
+        [Display(Name = "6-Month VWAP: Stub Bands", Order = 47, GroupName = "5. Right-Edge Stub Mode")]
+        public bool SemiStubBands { get; set; }
+        
+        [Display(Name = "Year VWAP: Stub Mode", Order = 48, GroupName = "5. Right-Edge Stub Mode")]
+        public bool YearStubMode { get; set; }
+        
+        [Display(Name = "Year VWAP: Stub Bands", Order = 49, GroupName = "5. Right-Edge Stub Mode")]
+        public bool YearStubBands { get; set; }
+        
+        [Display(Name = "HOY VWAP: Stub Mode", Order = 50, GroupName = "5. Right-Edge Stub Mode")]
+        public bool HoyStubMode { get; set; }
         
         // ═══════════════════════════════════════════════
         // Voice Alerts
         // ═══════════════════════════════════════════════
         
-        [Display(Name = "Enable Voice Alerts", Description = "Auto-generate spoken alerts with instrument name (e.g., 'MNQ has touched the Session VWAP'). Uses edge-tts neural voice with SAPI5 fallback.", Order = 1, GroupName = "8. Voice Alerts")]
+        [Display(Name = "Enable Voice Alerts", Description = "Auto-generate spoken alerts with instrument name (e.g., 'MNQ has touched the Session VWAP'). Uses edge-tts neural voice with SAPI5 fallback.", Order = 1, GroupName = "9. Voice Alerts")]
         public bool EnableVoiceAlerts { get; set; }
         
         [Range(-10, 10)]
-        [Display(Name = "Voice Speed", Description = "Speech rate (-10 slowest to 10 fastest, 0 normal, 2 recommended)", Order = 2, GroupName = "8. Voice Alerts")]
+        [Display(Name = "Voice Speed", Description = "Speech rate (-10 slowest to 10 fastest, 0 normal, 2 recommended)", Order = 2, GroupName = "9. Voice Alerts")]
         public int VoiceAlertRate { get; set; }
         
-        [Display(Name = "Alert on VWAP Touch", Description = "Alert when price bar touches/crosses a VWAP level", Order = 3, GroupName = "8. Voice Alerts")]
+        [Display(Name = "Alert on VWAP Touch", Description = "Alert when price bar touches/crosses a VWAP level", Order = 3, GroupName = "9. Voice Alerts")]
         public bool AlertOnTouch { get; set; }
         
-        [Display(Name = "Alert on VWAP Approach", Description = "Alert when price is within approach distance of a VWAP", Order = 4, GroupName = "8. Voice Alerts")]
+        [Display(Name = "Alert on VWAP Approach", Description = "Alert when price is within approach distance of a VWAP", Order = 4, GroupName = "9. Voice Alerts")]
         public bool AlertOnApproach { get; set; }
         
         [Range(1, 50)]
-        [Display(Name = "Approach Distance (Ticks)", Description = "How close price needs to be to trigger an approach alert", Order = 5, GroupName = "8. Voice Alerts")]
+        [Display(Name = "Approach Distance (Ticks)", Description = "How close price needs to be to trigger an approach alert", Order = 5, GroupName = "9. Voice Alerts")]
         public int ApproachTicks { get; set; }
         
         [Range(5, 300)]
-        [Display(Name = "Alert Cooldown (Seconds)", Description = "Minimum time between repeated alerts for the same VWAP", Order = 6, GroupName = "8. Voice Alerts")]
+        [Display(Name = "Alert Cooldown (Seconds)", Description = "Minimum time between repeated alerts for the same VWAP", Order = 6, GroupName = "9. Voice Alerts")]
         public int AlertCooldownSeconds { get; set; }
         
-        [Display(Name = "Fallback Sound File", Description = "Sound file used if voice generation fails (e.g., 'Alert1.wav')", Order = 7, GroupName = "8. Voice Alerts")]
+        [Display(Name = "Fallback Sound File", Description = "Sound file used if voice generation fails (e.g., 'Alert1.wav')", Order = 7, GroupName = "9. Voice Alerts")]
         public string AlertFallbackSound { get; set; }
         
         // ═══════════════════════════════════════════════
@@ -2860,7 +3622,7 @@ Write-Host 'COPIED_MP3'
         public override bool GetStandardValuesSupported(ITypeDescriptorContext context) => true;
         public override bool GetStandardValuesExclusive(ITypeDescriptorContext context) => true;
         public override StandardValuesCollection GetStandardValues(ITypeDescriptorContext context)
-            => new StandardValuesCollection(new[] { "Session", "NY Session", "HOD", "LOD", "Month", "Year" });
+            => new StandardValuesCollection(new[] { "Session", "NY Session", "HOD", "LOD", "Week", "Month", "3-Month", "6-Month", "Year" });
     }
 }
 
@@ -2871,18 +3633,18 @@ namespace NinjaTrader.NinjaScript.Indicators
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
 		private RedTail.RedTailAutoVWAP[] cacheRedTailAutoVWAP;
-		public RedTail.RedTailAutoVWAP RedTailAutoVWAP(bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
+		public RedTail.RedTailAutoVWAP RedTailAutoVWAP(bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showWeekVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
 		{
-			return RedTailAutoVWAP(Input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
+			return RedTailAutoVWAP(Input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showWeekVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
 		}
 
-		public RedTail.RedTailAutoVWAP RedTailAutoVWAP(ISeries<double> input, bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
+		public RedTail.RedTailAutoVWAP RedTailAutoVWAP(ISeries<double> input, bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showWeekVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
 		{
 			if (cacheRedTailAutoVWAP != null)
 				for (int idx = 0; idx < cacheRedTailAutoVWAP.Length; idx++)
-					if (cacheRedTailAutoVWAP[idx] != null && cacheRedTailAutoVWAP[idx].ShowNyVwap == showNyVwap && cacheRedTailAutoVWAP[idx].ShowPrevNyVwap == showPrevNyVwap && cacheRedTailAutoVWAP[idx].ShowDayVwap == showDayVwap && cacheRedTailAutoVWAP[idx].ShowHodVwap == showHodVwap && cacheRedTailAutoVWAP[idx].ShowLodVwap == showLodVwap && cacheRedTailAutoVWAP[idx].ShowMonthVwap == showMonthVwap && cacheRedTailAutoVWAP[idx].ShowYearVwap == showYearVwap && cacheRedTailAutoVWAP[idx].ShowHoyVwap == showHoyVwap && cacheRedTailAutoVWAP[idx].ShowNyOpeningRange == showNyOpeningRange && cacheRedTailAutoVWAP[idx].ShowDayInitialBalance == showDayInitialBalance && cacheRedTailAutoVWAP[idx].EqualsInput(input))
+					if (cacheRedTailAutoVWAP[idx] != null && cacheRedTailAutoVWAP[idx].ShowNyVwap == showNyVwap && cacheRedTailAutoVWAP[idx].ShowPrevNyVwap == showPrevNyVwap && cacheRedTailAutoVWAP[idx].ShowDayVwap == showDayVwap && cacheRedTailAutoVWAP[idx].ShowHodVwap == showHodVwap && cacheRedTailAutoVWAP[idx].ShowLodVwap == showLodVwap && cacheRedTailAutoVWAP[idx].ShowWeekVwap == showWeekVwap && cacheRedTailAutoVWAP[idx].ShowMonthVwap == showMonthVwap && cacheRedTailAutoVWAP[idx].ShowYearVwap == showYearVwap && cacheRedTailAutoVWAP[idx].ShowHoyVwap == showHoyVwap && cacheRedTailAutoVWAP[idx].ShowNyOpeningRange == showNyOpeningRange && cacheRedTailAutoVWAP[idx].ShowDayInitialBalance == showDayInitialBalance && cacheRedTailAutoVWAP[idx].EqualsInput(input))
 						return cacheRedTailAutoVWAP[idx];
-			return CacheIndicator<RedTail.RedTailAutoVWAP>(new RedTail.RedTailAutoVWAP(){ ShowNyVwap = showNyVwap, ShowPrevNyVwap = showPrevNyVwap, ShowDayVwap = showDayVwap, ShowHodVwap = showHodVwap, ShowLodVwap = showLodVwap, ShowMonthVwap = showMonthVwap, ShowYearVwap = showYearVwap, ShowHoyVwap = showHoyVwap, ShowNyOpeningRange = showNyOpeningRange, ShowDayInitialBalance = showDayInitialBalance }, input, ref cacheRedTailAutoVWAP);
+			return CacheIndicator<RedTail.RedTailAutoVWAP>(new RedTail.RedTailAutoVWAP(){ ShowNyVwap = showNyVwap, ShowPrevNyVwap = showPrevNyVwap, ShowDayVwap = showDayVwap, ShowHodVwap = showHodVwap, ShowLodVwap = showLodVwap, ShowWeekVwap = showWeekVwap, ShowMonthVwap = showMonthVwap, ShowYearVwap = showYearVwap, ShowHoyVwap = showHoyVwap, ShowNyOpeningRange = showNyOpeningRange, ShowDayInitialBalance = showDayInitialBalance }, input, ref cacheRedTailAutoVWAP);
 		}
 	}
 }
@@ -2891,14 +3653,14 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.RedTail.RedTailAutoVWAP RedTailAutoVWAP(bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
+		public Indicators.RedTail.RedTailAutoVWAP RedTailAutoVWAP(bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showWeekVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
 		{
-			return indicator.RedTailAutoVWAP(Input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
+			return indicator.RedTailAutoVWAP(Input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showWeekVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
 		}
 
-		public Indicators.RedTail.RedTailAutoVWAP RedTailAutoVWAP(ISeries<double> input , bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
+		public Indicators.RedTail.RedTailAutoVWAP RedTailAutoVWAP(ISeries<double> input , bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showWeekVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
 		{
-			return indicator.RedTailAutoVWAP(input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
+			return indicator.RedTailAutoVWAP(input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showWeekVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
 		}
 	}
 }
@@ -2907,14 +3669,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.RedTail.RedTailAutoVWAP RedTailAutoVWAP(bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
+		public Indicators.RedTail.RedTailAutoVWAP RedTailAutoVWAP(bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showWeekVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
 		{
-			return indicator.RedTailAutoVWAP(Input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
+			return indicator.RedTailAutoVWAP(Input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showWeekVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
 		}
 
-		public Indicators.RedTail.RedTailAutoVWAP RedTailAutoVWAP(ISeries<double> input , bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
+		public Indicators.RedTail.RedTailAutoVWAP RedTailAutoVWAP(ISeries<double> input , bool showNyVwap, bool showPrevNyVwap, bool showDayVwap, bool showHodVwap, bool showLodVwap, bool showWeekVwap, bool showMonthVwap, bool showYearVwap, bool showHoyVwap, bool showNyOpeningRange, bool showDayInitialBalance)
 		{
-			return indicator.RedTailAutoVWAP(input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
+			return indicator.RedTailAutoVWAP(input, showNyVwap, showPrevNyVwap, showDayVwap, showHodVwap, showLodVwap, showWeekVwap, showMonthVwap, showYearVwap, showHoyVwap, showNyOpeningRange, showDayInitialBalance);
 		}
 	}
 }
